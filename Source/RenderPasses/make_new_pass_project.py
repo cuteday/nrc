@@ -28,7 +28,7 @@ def create_project(name):
         print(f'Writing {dst_file}.')
 
         # Replace all occurrences 'PassLibraryTemplate' and 'RenderPassTemplate' with new project name.
-        content = src_file.read_text()
+        content = src_file.read_text(encoding='utf-8-sig')
         content = content.replace(TEMPLATE_NAME, name)
         content = content.replace('RenderPassTemplate', name)
         dst_file.write_text(content)

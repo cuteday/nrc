@@ -26,11 +26,55 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 #pragma once
+#include "Falcor.h"
 
-#define _LOG_ENABLED        1 // Set this to 0 to disable logging and most error checks
+using namespace Falcor;
 
-#define _PROFILING_ENABLED  1 // Set this to 1 to enable CPU/GPU profiling
+class RenderGraphEditor : public IRenderer
+{
+public:
+    struct Options
+    {
+        std::string graphFile;
+        std::string graphName;
+        bool runFromMogwai = false;
+    };
 
-#define _ENABLE_NVAPI       1 // Set this to 1 to enable NVIDIA specific DX extensions. Make sure you have the NVAPI package in your 'Externals' directory. View the readme for more information.
-#define _ENABLE_CUDA        0 // Set this to 1 to enable CUDA use and CUDA/DX interoperation. Make sure you have the CUDA SDK package in your 'Externals' directory. View the readme for more information.
-#define _ENABLE_OPTIX       0 // Set this to 1 to enable OptiX. Make sure you have the OptiX SDK package in your 'Externals' directory. View the readme for more information.
+    RenderGraphEditor(const Options& options);
+    ~RenderGraphEditor();
+
+    void onLoad(RenderContext* pRenderContext) override;
+    void onFrameRender(RenderContext* pRenderContext, const Fbo::SharedPtr& pTargetFbo) override;
+    void onResizeSwapChain(uint32_t width, uint32_t height) override;
+    void onGuiRender(Gui* pGui) override;
+    void onDroppedFile(const std::string& filename) override;
+
+private:
+    void createNewGraph(const std::string& renderGraphName);
+    void loadGraphsFromFile(const std::string& fileName, const std::string& graphName = "");
+    void serializeRenderGraph(const std::string& fileName);
+    void deserializeRenderGraph(const std::string& fileName);
+    void renderLogWindow(Gui::Widgets& widget);
+    void loadAllPassLibraries();
+
+    Options mOptions;
+
+    std::vector<RenderGraph::SharedPtr> mpGraphs;
+    std::vector<RenderGraphUI> mRenderGraphUIs;
+    std::unordered_map<std::string, uint32_t> mGraphNamesToIndex;
+    size_t mCurrentGraphIndex;
+    uint2 mWindowSize;
+    std::string mCurrentLog;
+    std::string mNextGraphString;
+    std::string mCurrentGraphOutput;
+    std::string mGraphOutputEditString;
+    std::string mUpdateFilePath;
+    Texture::SharedPtr mpDefaultIconTex;
+
+    Gui::DropdownList mOpenGraphNames;
+    bool mShowCreateGraphWindow = false;
+    bool mShowDebugWindow = false;
+    bool mViewerRunning = false;
+    size_t mViewerProcess = 0;
+    bool mResetGuiWindows = false;
+};
