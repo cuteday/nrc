@@ -1,14 +1,13 @@
 #pragma once
 #include "Falcor.h"
 #include "FalcorExperimental.h"
-#include "Utils/Sampling/SampleGenerator.h"
 
 using namespace Falcor;
 
-class RTAO : public RenderPass
+class RTLightingPass : public RenderPass
 {
 public:
-    using SharedPtr = std::shared_ptr<RTAO>;
+    using SharedPtr = std::shared_ptr<RTLightingPass>;
 
     /** Create a new render pass object.
         \param[in] pRenderContext The render context.
@@ -28,19 +27,12 @@ public:
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent) override { return false; }
 
 private:
-    RTAO() = default;
-    RTAO(const Dictionary& dict);
+    RTLightingPass() = default;
 
-    // rtao parameters
-    float mAoRadius = 0.30f;
     float mMinT = 0.0001f;
-    uint mSampleCount = 8;
-
     uint mFrameCount = 0;
 
     Scene::SharedPtr mpScene = nullptr;
-
-    SampleGenerator::SharedPtr mpSampleGenerator = nullptr;
 
     RtProgram::SharedPtr mpProgram = nullptr;
     RtProgramVars::SharedPtr mpProgramVars = nullptr;

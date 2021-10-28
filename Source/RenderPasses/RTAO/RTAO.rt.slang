@@ -91,6 +91,7 @@ void miss(inout RayPayload rayData)
 [shader("anyhit")]
 void anyHit(inout RayPayload rayData, BuiltInTriangleIntersectionAttributes attribs)
 {
+    // a copy-paste routine
     GeometryInstanceID instanceID = getGeometryInstanceID();
     VertexData v = getVertexData(instanceID, PrimitiveIndex(), attribs);
     const uint materialID = gScene.getMaterialID(instanceID);

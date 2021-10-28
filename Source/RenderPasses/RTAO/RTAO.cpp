@@ -23,14 +23,14 @@ namespace
     // these helper functions sets UAV flags and r32f formats for you (*/ω＼*)
     const ChannelList kInputChannels = {
         // see ChannelList defination...
-        {"colorIn", "gColorIn", ""},
-        {"normalW", "gNormals", ""},
-        {"posW", "gWorldPos", ""}
+        {"colorIn", "gColorIn", "Input color buffer"},
+        {"normalW", "gNormals", "World space normals in[0, 1]"},
+        {"posW", "gWorldPos", "World positions [xyz] and foreground flag [w]"}
     };
 
     const ChannelList kOutputChannels = {
-        {"colorOut", "gColorOut", ""},
-        {"aoMap", "gAoMap", ""}
+        {"colorOut", "gColorOut", "Output target buffer"},
+        {"aoMap", "gAoMap", "Ambient occlusion factor"}
     };
 
     // Ray tracing settings that affect the traversal stack size.
