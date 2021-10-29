@@ -33,6 +33,7 @@ private:
     uint mFrameCount = 0;
 
     Scene::SharedPtr mpScene = nullptr;
+    EnvMapLighting::SharedPtr mpEnvMapLighting;
 
     RtProgram::SharedPtr mpProgram = nullptr;
     RtProgramVars::SharedPtr mpProgramVars = nullptr;

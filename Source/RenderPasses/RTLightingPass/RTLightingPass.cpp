@@ -10,11 +10,12 @@ namespace
     const ChannelList kInputChannels = {
         {"normalW", "gNormals", ""},
         {"posW", "gWorldPos", ""},
-        {"diffuseMtl", "gDiffuseMtl", ""}
+        {"diffuseMtl", "gDiffuseMtl", ""},
+        //{"colorIn", "gColorIn"}
     };
 
     const ChannelList kOutputChannels = {
-        {"color", "gColor"}
+        {"colorOut", "gColorOut"}
     };
 
     const std::string kMinT = "minT";
@@ -74,6 +75,9 @@ void RTLightingPass::execute(RenderContext* pRenderContext, const RenderData& re
     for (auto& channel : kInputChannels)bind(channel);
     for (auto& channel : kOutputChannels)bind(channel);
 
+    // conventional routine: setting up environment map lighting
+
+
     const uint2 targetDim = renderData.getDefaultTextureDims();
     assert(targetDim.x > 0 && targetDim.y > 0);
     mpScene->raytrace(pRenderContext, mpProgram.get(), mpProgramVars, uint3(targetDim, 1));
@@ -107,5 +111,16 @@ void RTLightingPass::setScene(RenderContext* pRenderContext, const Scene::Shared
 
         mpProgram = RtProgram::create(desc);
         mpProgramVars = RtProgramVars::create(mpProgram, sbt);
+
+        //const auto& pEnvMap = mpScene->getEnvMap();
+        //auto var = mpProgramVars->getRootVar();
+
+        //if (pEnvMap && (!mpEnvMapLighting || mpEnvMapLighting->getEnvMap() != pEnvMap)) {
+        //    mpEnvMapLighting = EnvMapLighting::create(pRenderContext, pEnvMap);
+        //    mpEnvMapLighting->setShaderData(var["gEnvMap"]);
+        //}
+        //else if (!pEnvMap) {
+        //    mpEnvMapLighting = nullptr;
+        //}
     }
 }

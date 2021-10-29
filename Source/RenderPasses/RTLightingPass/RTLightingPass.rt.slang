@@ -17,8 +17,9 @@ cbuffer RayTraceCB
 Texture2D<float4> gWorldPos;
 Texture2D<float4> gNormals;
 Texture2D<float4> gDiffuseMtl;
+Texture2D<float4> gEnvMap;
 
-RWTexture2D<float4> gColor;
+RWTexture2D<float4> gColorOut;
 
 struct RayPayload
 {
@@ -35,10 +36,13 @@ void rayGen()
     float3 worldNormal = gNormals[launchIndex].xyz;
     float3 diffuse = gDiffuseMtl[launchIndex].xyz;
 
+    const float3 viewDir = gScene.camera.computeRayPinhole(launchIndex, launchDim).dir;
+
     if (worldPos.w == 0.0f)
     {
         // evaluate skybox color
-        gColor[launchIndex] = float4(0.0f);
+        float3 Le = gScene.envMap.eval(viewDir);
+        gColorOut[launchIndex] = float4(Le, 1.0);
         return;
     }
 
@@ -62,7 +66,7 @@ void rayGen()
         shadeColor += ls.Li * diffuse / M_PI * G / (ls.pdf > 0.f ? ls.pdf : 1.f);
     }
     shadeColor /= gScene.getLightCount();
-    gColor[launchIndex] = float4(shadeColor, 1.0f);
+    gColorOut[launchIndex] = float4(shadeColor, 1.0f);
 }
 
 [shader("miss")]
