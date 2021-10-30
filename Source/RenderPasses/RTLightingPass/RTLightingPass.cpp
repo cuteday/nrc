@@ -8,10 +8,13 @@ namespace
     const std::string kProgramRaytraceFile = "RenderPasses/RTLightingPass/RTLightingPass.rt.slang";
 
     const ChannelList kInputChannels = {
-        {"normalW", "gNormals", ""},
+        {"shadingNormalW", "gShadingNormals", ""},
+        {"faceNormalW", "gFaceNormals", ""},
         {"posW", "gWorldPos", ""},
-        {"diffuseMtl", "gDiffuseMtl", ""},
-        //{"colorIn", "gColorIn"}
+        {"diffuseOpacity", "gDiffuseOpacity", ""},
+        {"specRough", "gSpecRough", ""},
+        {"emissive", "gEmissive", ""},
+        {"mtlExtraParams", "gMtlExtraParams", ""}
     };
 
     const ChannelList kOutputChannels = {
@@ -19,6 +22,7 @@ namespace
     };
 
     const std::string kMinT = "minT";
+    const std::string kDirectSampleCount = "directSampleCount";
 
     const uint32_t kMaxPayloadSizeBytes = 80u;
     const uint32_t kMaxAttributeSizeBytes = 8u;
@@ -36,9 +40,18 @@ extern "C" __declspec(dllexport) void getPasses(Falcor::RenderPassLibrary& lib)
     lib.registerClass("RTLightingPass", kDesc, RTLightingPass::create);
 }
 
+RTLightingPass::RTLightingPass(const Dictionary& dict)
+{
+    for (const auto& [key, value] : dict) {
+        if (key == kMinT) mMinT = value;
+    }
+    mpSampleGenerator = SampleGenerator::create(SAMPLE_GENERATOR_UNIFORM);
+    assert(mpSampleGenerator);
+}
+
 RTLightingPass::SharedPtr RTLightingPass::create(RenderContext* pRenderContext, const Dictionary& dict)
 {
-    SharedPtr pPass = SharedPtr(new RTLightingPass);
+    SharedPtr pPass = SharedPtr(new RTLightingPass(dict));
     return pPass;
 }
 
@@ -48,6 +61,7 @@ Dictionary RTLightingPass::getScriptingDictionary()
 {
     Dictionary d;
     d[kMinT] = mMinT;
+    d[kDirectSampleCount] = mDirectSampleCount;
     return d;
 }
 
@@ -68,15 +82,13 @@ void RTLightingPass::execute(RenderContext* pRenderContext, const RenderData& re
     auto var = mpProgramVars->getRootVar();
     var["RayTraceCB"]["gFrameCount"] = mFrameCount;
     var["RayTraceCB"]["gMinT"] = mMinT;
+    var["RayTraceCB"]["gDirectSampleCount"] = mDirectSampleCount;
 
     auto bind = [&](const ChannelDesc& desc) {
         var[desc.texname] = renderData[desc.name]->asTexture();
     };
     for (auto& channel : kInputChannels)bind(channel);
     for (auto& channel : kOutputChannels)bind(channel);
-
-    // conventional routine: setting up environment map lighting
-
 
     const uint2 targetDim = renderData.getDefaultTextureDims();
     assert(targetDim.x > 0 && targetDim.y > 0);
@@ -88,6 +100,8 @@ void RTLightingPass::renderUI(Gui::Widgets& widget)
 {
     widget.text("Hello DXR lighting!");
     widget.var("Minimum ray distance", mMinT, 0.0f, 0.02f, 0.0001f);
+    widget.var("Direct lighting sample count", mDirectSampleCount, 0u, 64u, 1);
+    widget.tooltip("Average weighting these direct samples, 0 means sampling each light once");
 }
 
 void RTLightingPass::setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene)
@@ -103,6 +117,7 @@ void RTLightingPass::setScene(RenderContext* pRenderContext, const Scene::Shared
         desc.setMaxAttributeSize(kMaxAttributeSizeBytes);
         desc.setMaxTraceRecursionDepth(kMaxRecursionDepth);
         desc.addDefines(mpScene->getSceneDefines());
+        desc.addDefines(mpSampleGenerator->getDefines());
 
         RtBindingTable::SharedPtr sbt = RtBindingTable::create(1, 1, mpScene->getGeometryCount());
         sbt->setRayGen(desc.addRayGen("rayGen"));
@@ -112,9 +127,11 @@ void RTLightingPass::setScene(RenderContext* pRenderContext, const Scene::Shared
         mpProgram = RtProgram::create(desc);
         mpProgramVars = RtProgramVars::create(mpProgram, sbt);
 
-        //const auto& pEnvMap = mpScene->getEnvMap();
-        //auto var = mpProgramVars->getRootVar();
+        auto var = mpProgramVars->getRootVar();
+        mpSampleGenerator->setShaderData(var);
 
+        // conventional routine: setting up environment map lighting
+        //const auto& pEnvMap = mpScene->getEnvMap();
         //if (pEnvMap && (!mpEnvMapLighting || mpEnvMapLighting->getEnvMap() != pEnvMap)) {
         //    mpEnvMapLighting = EnvMapLighting::create(pRenderContext, pEnvMap);
         //    mpEnvMapLighting->setShaderData(var["gEnvMap"]);
@@ -124,3 +141,4 @@ void RTLightingPass::setScene(RenderContext* pRenderContext, const Scene::Shared
         //}
     }
 }
+

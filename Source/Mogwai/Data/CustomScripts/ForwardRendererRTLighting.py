@@ -43,11 +43,15 @@ def render_graph_ForwardRenderRTLighting():
     BlitPass = createPass('BlitPass', {'filter': SamplerFilter.Linear})
     g.addPass(BlitPass, 'BlitPass')
     g.addEdge('RTLightingPass.colorOut', 'ToneMapper.src')
-    g.addEdge('GBufferRT.diffuseOpacity', 'RTLightingPass.diffuseMtl')
     g.addEdge('GBufferRT.posW', 'RTLightingPass.posW')
-    g.addEdge('GBufferRT.normW', 'RTLightingPass.normalW')
     g.addEdge('ToneMapper.dst', 'FXAA.src')
     g.addEdge('FXAA.dst', 'BlitPass.src')
+    g.addEdge('GBufferRT.normW', 'RTLightingPass.shadingNormalW')
+    g.addEdge('GBufferRT.faceNormalW', 'RTLightingPass.faceNormalW')
+    g.addEdge('GBufferRT.specRough', 'RTLightingPass.specRough')
+    g.addEdge('GBufferRT.diffuseOpacity', 'RTLightingPass.diffuseOpacity')
+    g.addEdge('GBufferRT.emissive', 'RTLightingPass.emissive')
+    g.addEdge('GBufferRT.matlExtra', 'RTLightingPass.mtlExtraParams')
     g.markOutput('BlitPass.dst')
     return g
 

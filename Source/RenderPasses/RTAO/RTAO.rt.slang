@@ -26,8 +26,10 @@ struct RayPayload
 float3x3 tbnFromNormal(float3 normal, SampleGenerator sg)
 {
     // create a random TBN with normal -> +z
-    float3 randDir = sampleNext3D(sg);
-    float3 tangent = normalize(randDir - normal * dot(normal, randDir));
+    /*    float3 randDir = sampleNext3D(sg);
+        float3 tangent = normalize(randDir - normal * dot(normal, randDir));*/
+    // A better impl. in math helpers.
+    float3 tangent = perp_sterk(normal);
     float3 bitangent = cross(normal, tangent);
     // note thet the constructor fills the matrix in a row-major order
     return float3x3(tangent, bitangent, normal);

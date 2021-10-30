@@ -1,6 +1,7 @@
 #pragma once
 #include "Falcor.h"
 #include "FalcorExperimental.h"
+#include "Utils/Sampling/SampleGenerator.h"
 
 using namespace Falcor;
 
@@ -28,12 +29,15 @@ public:
 
 private:
     RTLightingPass() = default;
+    RTLightingPass(const Dictionary& dict);
 
     float mMinT = 0.0001f;
+    uint mDirectSampleCount = 4;
     uint mFrameCount = 0;
 
     Scene::SharedPtr mpScene = nullptr;
     EnvMapLighting::SharedPtr mpEnvMapLighting;
+    SampleGenerator::SharedPtr mpSampleGenerator;
 
     RtProgram::SharedPtr mpProgram = nullptr;
     RtProgramVars::SharedPtr mpProgramVars = nullptr;
