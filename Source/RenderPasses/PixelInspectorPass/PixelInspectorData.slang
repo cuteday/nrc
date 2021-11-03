@@ -96,7 +96,8 @@ struct PixelData
 #ifdef HOST_CODE
     void init()
 #else
-    [mutating] void init()
+    [mutating]
+    void init()
 #endif
     {
         posW = float3(0, 0, 0);
