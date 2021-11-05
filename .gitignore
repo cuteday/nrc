@@ -19,3 +19,4 @@ Tools/.packman
 Tests/data
 *.tlog
 *.log
+Build/
