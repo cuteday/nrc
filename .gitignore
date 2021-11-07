@@ -20,3 +20,4 @@ Tests/data
 *.tlog
 *.log
 Build/
+Source/tiny-cuda-nn/
