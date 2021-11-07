@@ -83,6 +83,7 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_86,sm_86</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -99,8 +100,8 @@
     <ClInclude Include="FalcorCUDA.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CudaInterop.cu" />
-    <ClCompile Include="FalcorCUDA.cu" />
+    <ClCompile Include="CudaInterop.cpp" />
+    <ClCompile Include="FalcorCUDA.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
