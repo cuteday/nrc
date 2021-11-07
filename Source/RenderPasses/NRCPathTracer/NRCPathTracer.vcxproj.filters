@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="NRCPathTracer.cpp" />
+    <ClCompile Include="NRC.cpp">
+      <Filter>NN</Filter>
+    </ClCompile>
+    <ClCompile Include="FalcorCUDA.cpp">
+      <Filter>CUDA</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="NRCPathTracer.h" />
+    <ClInclude Include="NRC.h">
+      <Filter>NN</Filter>
+    </ClInclude>
+    <ClInclude Include="FalcorCUDA.h">
+      <Filter>CUDA</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ShaderSource Include="PathTracer.rt.slang" />
+    <ShaderSource Include="PathTracer.slang" />
+    <ShaderSource Include="NRC.slang" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="NN">
+      <UniqueIdentifier>{16dbf540-b0dd-4158-80b4-9ee72b594be7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CUDA">
+      <UniqueIdentifier>{e7610912-87d3-4c65-9daa-30e1274ab051}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

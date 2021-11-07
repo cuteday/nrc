@@ -96,6 +96,7 @@ RenderPassReflection PixelInspectorPass::reflect(const CompileData& compileData)
         auto& f = reflector.addInput(it.name, it.desc).format(it.format);
         if (it.optional) f.flags(RenderPassReflection::Field::Flags::Optional);
     }
+    reflector.addOutput("fakeOutput", "just pretending to have it");
     return reflector;
 }
 

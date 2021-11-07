@@ -140,10 +140,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
     const HitInfo hit = HitInfo(gVBuffer[gVBufferCoord]);
     if (hit.isValid())
     {
-        data.instanceType = (uint)hit.type;
+        data.hitType = (uint)hit.getType();
+        data.instanceID = hit.data[0] & HitInfo::kData0Mask;
+        data.primitiveIndex = hit.data[1];
+        data.barycentrics = float2(asfloat(hit.data[2]), asfloat(hit.data[3]));
+/*        data.instanceType = (uint)hit.type;
         data.instanceID = hit.instanceID.index;
         data.primitiveIndex = hit.primitiveIndex;
-        data.barycentrics = hit.barycentrics;
+        data.barycentrics = hit.barycentrics;*/
     }
 
     // Store result
