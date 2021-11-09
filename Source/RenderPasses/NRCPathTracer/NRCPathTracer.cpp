@@ -74,15 +74,15 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             throw std::runtime_error("Structure buffer size mismatch: training query");
     }
     if (!mNRC.pTrainingRadianceRecord) {
-        mNRC.pTrainingRadianceQuery = Buffer::createStructured(sizeof(NRC::RadianceRecord), mNRC.maximum_training_buffer_size,
+        mNRC.pTrainingRadianceRecord = Buffer::createStructured(sizeof(NRC::RadianceRecord), mNRC.maximum_training_buffer_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        if (mNRC.pTrainingRadianceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
-            throw std::runtime_error("Structure buffer size mismatch: training query");
+        if (mNRC.pTrainingRadianceRecord->getStructSize() != sizeof(NRC::RadianceRecord))
+            throw std::runtime_error("Structure buffer size mismatch: training record");
     }
     if (!mNRC.pInferenceRadiaceQuery) {
-        mNRC.pInferenceRadiaceQuery = Buffer::createStructured(sizeof(NRC::RadianceRecord), mNRC.maximum_inference_buffer_size,
+        mNRC.pInferenceRadiaceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.maximum_inference_buffer_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        if (mNRC.pTrainingRadianceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
+        if (mNRC.pInferenceRadiaceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: inference query");
     }
     //pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
@@ -155,6 +155,9 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
 
     // Set shared data into parameter block.
     setTracerData(renderData);
+
+    // Set NRC data and parameters
+    setNRCData(renderData);
 
     // Bind I/O buffers. These needs to be done per-frame as the buffers may change anytime.
     auto bind = [&](const ChannelDesc& desc)
@@ -231,8 +234,15 @@ void NRCPathTracer::setTracerData(const RenderData& renderData)
         bool success = mpEmissiveSampler->setShaderData(pBlock["emissiveSampler"]);
         if (!success) throw std::exception("Failed to bind emissive light sampler");
     }
+}
 
+void NRCPathTracer::setNRCData(const RenderData& renderData)
+{
     // NRC related testing process
     auto pVars = mTracer.pVars;
-
+    // width * height
+    pVars["NRCDataCB"]["screenSize"] = renderData.getDefaultTextureDims();
+    pVars["NRCDataCB"]["trainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * mNRC.trainingPathOffset.x,
+        std::rand() / (float)RAND_MAX * mNRC.trainingPathOffset.y);
 }
+

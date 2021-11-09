@@ -38,6 +38,7 @@ private:
     void recreateVars() override { mTracer.pVars = nullptr; }
     void prepareVars();
     void setTracerData(const RenderData& renderData);
+    void setNRCData(const RenderData& renderData);
 
     // Ray tracing program.
     struct
@@ -51,6 +52,7 @@ private:
     // Neural radiance cache parameters and data fields
     struct {
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
+        uint2 trainingPathOffset = uint2(6, 6);
         uint maximum_inference_buffer_size = 1920 * 1080;
         uint maximum_training_buffer_size = 1920 * 1080 / 36 * 10;
         Buffer::SharedPtr pTrainingRadianceQuery;

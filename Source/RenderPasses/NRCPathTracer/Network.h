@@ -16,11 +16,9 @@ namespace NRC {
         using WeakPtr = std::weak_ptr<NRCNetwork>;
         using SharedConstPtr = std::shared_ptr<const NRCNetwork>;
 
-
         NRCNetwork();
 
     private:
-
         void initializeNetwork();
 
     };

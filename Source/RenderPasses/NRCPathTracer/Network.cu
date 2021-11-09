@@ -13,7 +13,7 @@ namespace {
         int batch_size = 1 << 14;
         int input_dims = 5;
         int output_dims = 3;
-        std::string config_path = "Source/tiny-cuda-nn/config/default_nrc.json";
+        std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc.json";
     } mNetworkParams;
 
     struct {
@@ -54,7 +54,7 @@ namespace NRC {
 
         mNetwork.loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
         mNetwork.optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-        mNetwork.network = std::shared_ptr<Network<precision_t>>(create_network<precision_t>(network_opts));
+        //mNetwork.network = std::shared_ptr<Network<precision_t>>(create_network<precision_t>(network_opts));
 
         mNetworkMemory.train_data = new GPUMatrix<float>(mNetworkParams.input_dims, mNetworkParams.batch_size);
         mNetworkMemory.train_target = new GPUMatrix<float>(mNetworkParams.output_dims, mNetworkParams.batch_size);
