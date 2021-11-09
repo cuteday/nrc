@@ -17,6 +17,9 @@
     <ClInclude Include="FalcorCUDA.h">
       <Filter>CUDA</Filter>
     </ClInclude>
+    <ClInclude Include="Network.h">
+      <Filter>NN</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ShaderSource Include="PathTracer.rt.slang" />
@@ -30,5 +33,10 @@
     <Filter Include="CUDA">
       <UniqueIdentifier>{e7610912-87d3-4c65-9daa-30e1274ab051}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="Network.cu">
+      <Filter>NN</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

@@ -166,10 +166,6 @@ void rayGen()
         outAlpha = kForceAlphaOne ? 1.f : 0.f;
     }
 
-    // testing
-    if (launchIndex.x == 0)
-        recordSample(launchIndex.y);
-
     // DEBUG
     assert(!any(isnan(outColor)));
 

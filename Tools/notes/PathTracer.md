@@ -2,7 +2,19 @@
 
 ### Methods
 
+### Auxillary Classes
 
+基本位于`RenderPasses/Shared/PathTracer/`,以及`Scene/`中
+
+#### PathData
+
+当前的光线信息，throughput，pdf，hitinfo等等，累计的path contribution，用于当前路径的sanple generator，记录当前路径的ray footprint，以及一个维护了路径上材质信息的interior list。
+
+#### Packed Hit Info
+
+#### Ray Footprint
+
+主要两个属性，`width`和`spread angle`.
 
 ### Debugging
 

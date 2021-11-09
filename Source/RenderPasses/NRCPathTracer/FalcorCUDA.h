@@ -3,6 +3,7 @@
 
 #include <Falcor.h>
 
+
 namespace FalcorCUDA
 {
     /** Initializes the CUDA driver API. Returns true if successful, false otherwise.

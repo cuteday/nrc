@@ -4,10 +4,7 @@
 #include "NRC.h"
 
 using namespace Falcor;
-using Falcor::uint;
-using Falcor::uint2;
-using Falcor::uint3;
-using Falcor::uint4;
+
 
 /** Forward path tracer using a NRC.
 
@@ -51,10 +48,13 @@ private:
         ParameterBlock::SharedPtr pParameterBlock;      ///< ParameterBlock for all data.
     } mTracer;
 
-    // Neural radiance cache
+    // Neural radiance cache parameters and data fields
     struct {
-        Buffer::SharedPtr pSample = nullptr;
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
-
+        uint maximum_inference_buffer_size = 1920 * 1080;
+        uint maximum_training_buffer_size = 1920 * 1080 / 36 * 10;
+        Buffer::SharedPtr pTrainingRadianceQuery;
+        Buffer::SharedPtr pTrainingRadianceRecord;
+        Buffer::SharedPtr pInferenceRadiaceQuery;
     } mNRC;
 };
