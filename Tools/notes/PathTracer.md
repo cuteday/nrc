@@ -6,11 +6,17 @@
 
 基本位于`RenderPasses/Shared/PathTracer/`,以及`Scene/`中
 
-#### PathData
+##### ShadingsData
 
-当前的光线信息，throughput，pdf，hitinfo等等，累计的path contribution，用于当前路径的sanple generator，记录当前路径的ray footprint，以及一个维护了路径上材质信息的interior list。
+包含Geometry信息，像是face normal、shading normal、tangent；以及材质信息，roughness、opacity、emissive等。
 
-#### Packed Hit Info
+##### PathData
+
+当前的光线信息，throughput，pdf，hitinfo等等，累计的path contribution，用于当前路径的sanple generator，记录当前路径的ray footprint，以及一个维护了路径上材质信息的interior list，其实是一个固定长度的数组。
+
+##### Packed Hit Info
+
+当前intersection的信息，精确定位到具体是哪一个三角形(triangle id)被击中了。
 
 #### Ray Footprint
 

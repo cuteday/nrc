@@ -13,7 +13,7 @@ import Utils.Timing.GpuTimer;
 import RenderPasses.Shared.PathTracer.LoadShadingData;
 
 // Neural networks related
-__exported import NRC;
+//__exported import NRC;
 
 ParameterBlock<PathTracerData> gData;
 
@@ -99,6 +99,7 @@ void rayGen()
 
     logSetPixel(launchIndex);
     printSetPixel(launchIndex);
+    NRCSetPixel(launchIndex);
 
     GpuTimer timer;
     if (is_valid(gOutputTime)) timer.start();
@@ -109,6 +110,7 @@ void rayGen()
 
     HitInfo hit;
     ShadingData sd;
+    // loads the geometry info of current pixel (primary hit) into ShadingData sd and HitInfo hit
     if (loadShadingData(launchIndex, launchDim, gScene.camera, sd, hit))
     {
         // Pixel represents a primary hit. Compute its contribution.
@@ -142,7 +144,9 @@ void rayGen()
             }
 
             // Trace the path.
-            tracePath(gData, sd, path);
+            if (gNRCEnable)
+                tracePathNRC(gData, sd, path);
+            else tracePath(gData, sd, path);
 
             logPathLength(path.length);
 

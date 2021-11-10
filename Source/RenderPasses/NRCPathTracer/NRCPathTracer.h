@@ -52,9 +52,14 @@ private:
     // Neural radiance cache parameters and data fields
     struct {
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
-        uint2 trainingPathOffset = uint2(6, 6);
+        uint2 trainingPathStride = uint2(6, 6);
+        uint2 trainingPathStrideRR = uint2(24 * 24);
         uint maximum_inference_buffer_size = 1920 * 1080;
         uint maximum_training_buffer_size = 1920 * 1080 / 36 * 10;
+        int max_training_bounces = 5;       // max path segments for training suffix
+        int max_training_rr_bounces = 10;
+        int max_inference_bounces = 5;
+
         Buffer::SharedPtr pTrainingRadianceQuery;
         Buffer::SharedPtr pTrainingRadianceRecord;
         Buffer::SharedPtr pInferenceRadiaceQuery;

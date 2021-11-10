@@ -115,6 +115,12 @@ void NRCPathTracer::setScene(RenderContext* pRenderContext, const Scene::SharedP
         desc.addDefine("MAX_BOUNCES", std::to_string(mSharedParams.maxBounces));
         desc.addDefine("SAMPLES_PER_PIXEL", std::to_string(mSharedParams.samplesPerPixel));
 
+        // NRC related parameters definations
+        assert(mNRC.max_training_rr_bounces >= mNRC.max_training_bounces);
+        desc.addDefine("NRC_MAX_TRAINING_BOUNCES", std::to_string(mNRC.max_training_bounces));
+        desc.addDefine("NRC_MAX_TRAINING_RR_BOUNCES", std::to_string(mNRC.max_training_rr_bounces));
+        desc.addDefine("NRC_MAX_INFERENCE_BOUNCES", std::to_string(mNRC.maximum_inference_buffer_size));
+
         mTracer.pBindingTable = RtBindingTable::create(2, 2, mpScene->getGeometryCount());
         auto& sbt = mTracer.pBindingTable;
         sbt->setRayGen(desc.addRayGen("rayGen"));
@@ -241,8 +247,11 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     // NRC related testing process
     auto pVars = mTracer.pVars;
     // width * height
-    pVars["NRCDataCB"]["screenSize"] = renderData.getDefaultTextureDims();
-    pVars["NRCDataCB"]["trainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * mNRC.trainingPathOffset.x,
-        std::rand() / (float)RAND_MAX * mNRC.trainingPathOffset.y);
+    pVars["NRCDataCB"]["gNRCEnable"] = false;
+    pVars["NRCDataCB"]["gNRCScreenSize"] = renderData.getDefaultTextureDims();
+    pVars["NRCDataCB"]["gNRCTrainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.x,
+        std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.y);
+    pVars["NRCDataCB"]["gNRCTrainingPathStride"] = mNRC.trainingPathStride;
+    pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = mNRC.trainingPathStrideRR;
 }
 
