@@ -1,4 +1,5 @@
 import Utils.Math.MathHelpers;
+import RenderPasses.Shared.PathTracer.PathData;
 
 #ifndef NRC_MAX_TRAINING_BOUNCES
 #define NRC_MAX_TRAINING_BOUNCES 5
@@ -43,24 +44,25 @@ struct RadianceRecord
     float3 radiance;
 };
 
-struct RadianceInfo
+struct RadianceSample
 {
     // L_o (scattered radiance) = a * L_i + b
     float3 a;   // factor of scatter ray (bsdf sample)
     float3 b;   // the direct sample part
-    int idx;    // which query it blongs to?
+    int idx;    // which query it belongs to?
 };
 
 struct PathVertexRecord
 {
-    float3 thp;
-
+    RadianceQuery query;
+    float3 thp;     // current path throughput (not including BxDF, pdf of this vertex)
+    float3 L;       // current path contribution excluding scattering radiance from this vertex
 };
 
 // radiance training sample at maximum
 // for RR training data, no radiance info is needed
 RWStructuredBuffer<RadianceQuery> gTrainingRadianceQuery;
-RWStructuredBuffer<RadianceRecord> gTrainingRadianceRecord;
+RWStructuredBuffer<RadianceSample> gTrainingRadianceRecord;
 // for self training data, additional radiance info is needed
 
 // radiance query at screen resolution
@@ -104,12 +106,33 @@ bool isTrainingPathRR()
     return false;
 }
 
-void writeInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bias)
+PathVertexRecord generatePathVertexRecord(PathData path)
+{
+    RadianceQuery query = { path.origin, world_to_latlong_map(-path.dir) };
+    PathVertexRecord record = { query, path.thp, path.L };
+    return record;
+}
+
+void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bias)
 {
     RadianceQuery query = { pos, world_to_latlong_map(dir) };
     uint2 frameDim = gNRCScreenSize;
     int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
-    gScreenQueryFactor[index] = float4(factor, 1.0);
-    gScreenQueryBias[index] = float4(bias, 1.0);
+    gScreenQueryFactor[gNRCPixel] = float4(factor, 1.0);
+    gScreenQueryBias[gNRCPixel] = float4(bias, 1.0);
     gInferenceRadianceQuery[index] = query;
+}
+
+int addTrainingQuery(float3 pos, float3 dir)
+{
+    int idx = gTrainingRadianceQuery.IncrementCounter();
+    RadianceQuery query = { pos, world_to_latlong_map(dir) };
+    gTrainingRadianceQuery[idx] = query;
+}
+
+void addTrainingSample(int a, int b, int queryIndex)
+{
+    int idx = gTrainingRadianceRecord.IncrementCounter();
+    RadianceRecord record = { a, b, queryIndex};
+    gTrainingRadianceRecord[idx] = record;
 }

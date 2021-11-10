@@ -56,7 +56,7 @@ NRCPathTracer::NRCPathTracer(const Dictionary& dict)
 bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& renderData)
 {
     uint2 targetDim = renderData.getDefaultTextureDims();
-    if (targetDim.x * targetDim.y > mNRC.maximum_inference_buffer_size) {
+    if (targetDim.x * targetDim.y > mNRC.max_inference_query_size) {
         logFatal("Screen size exceeds maximum inference restriction");
     }
     bool state = PathTracer::beginFrame(pRenderContext, renderData);
@@ -68,19 +68,19 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
         /* there are 3 ways to create a structured buffer shader resource */
         //mNRC.pSample = Buffer::createStructured(mTracer.pProgram.get(), "gSample", 2000);
         //mNRC.pSample = Buffer::createStructured(mTracer.pVars.getRootVar()["gSample"], 2000);
-        mNRC.pTrainingRadianceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.maximum_training_buffer_size,
+        mNRC.pTrainingRadianceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.max_training_query_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pTrainingRadianceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: training query");
     }
     if (!mNRC.pTrainingRadianceRecord) {
-        mNRC.pTrainingRadianceRecord = Buffer::createStructured(sizeof(NRC::RadianceRecord), mNRC.maximum_training_buffer_size,
+        mNRC.pTrainingRadianceRecord = Buffer::createStructured(sizeof(NRC::RadianceRecord), mNRC.max_training_record_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pTrainingRadianceRecord->getStructSize() != sizeof(NRC::RadianceRecord))
             throw std::runtime_error("Structure buffer size mismatch: training record");
     }
     if (!mNRC.pInferenceRadiaceQuery) {
-        mNRC.pInferenceRadiaceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.maximum_inference_buffer_size,
+        mNRC.pInferenceRadiaceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.max_inference_query_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pInferenceRadiaceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: inference query");

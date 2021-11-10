@@ -144,16 +144,17 @@ void rayGen()
             }
 
             // Trace the path.
+            float3 L;
             if (gNRCEnable)
-                tracePathNRC(gData, sd, path);
-            else tracePath(gData, sd, path);
+                L = tracePathNRC(gData, sd, path);
+            else L = tracePath(gData, sd, path);
 
             logPathLength(path.length);
 
             // Accumulate after clamping.
             // Note the comparison is written so that NaNs propagate (unless the compiler rewrites it).
             // TODO: Check the generated code that this is the case.
-            outColor += gData.params.clampSamples && path.L > gData.params.clampThreshold ? gData.params.clampThreshold : path.L;
+            outColor += gData.params.clampSamples && L > gData.params.clampThreshold ? gData.params.clampThreshold : L;
         }
 
         // We're done accumulating over all samples.

@@ -134,7 +134,6 @@ bool traceScatterRay(float3 origin, float3 dir, inout InteriorList interiorList,
                 }
             }
         }
-
         break;
     }
 
@@ -278,7 +277,7 @@ void evalDirect(const PathTracerData pt, ShadingData sd, inout PathData path)
     }
 }
 
-void tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
+float3 tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
 {
     logPathVertex();
 
@@ -315,7 +314,7 @@ void tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
 
         // Generate next path segment. (Do BSDF importance sampling and update shading data & path data)
         // Here, the PathData scattering direction, throughput, and BxDF sampling pdf are updated.
-        if (!generateScatterRay(pt.params, sd, pt.standardMaterial, path, path.sg)) return;
+        if (!generateScatterRay(pt.params, sd, pt.standardMaterial, path, path.sg)) break;
 
         // Scatter the ray footprint out of the surface. Primary bounce is handled at footprint creation time.
         if (depth > 0)
@@ -329,13 +328,13 @@ void tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
         const bool isLastVertex = path.length == kMaxBounces || path.nonSpecularBounces > kMaxNonSpecularBounces;
 
         // Terminate if this is the last path vertex and light sampling already completely sampled incident radiance.
-        if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) return;
+        if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) break;
 
         // Terminate caustics paths.
-        if (kDisableCaustics && path.isSpecular() && path.nonSpecularBounces > 0) return;
+        if (kDisableCaustics && path.isSpecular() && path.nonSpecularBounces > 0) break;
 
         // Trace scatter ray, The path will either be directly terminated (for nested dielectrics) or a hit/miss is reported.
-        if (!traceScatterRay(path.origin, path.dir, path.interiorList, path.hit)) return;
+        if (!traceScatterRay(path.origin, path.dir, path.interiorList, path.hit)) break;
 
         const bool validHit = path.hit.isValid();
 
@@ -351,23 +350,28 @@ void tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
         if (!validHit) break;
         if (isLastVertex) break;
     }
-
+    return path.L;
 }
 
 // records on vertices of a path, for tracing back scattering radiance of each vertex.
-static PathVertexRecord pathRecords[NRC_MAX_TRAINING_RR_BOUNCES + NRC_MAX_INFERENCE_BOUNCES];
-void tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path)
+static PathVertexRecord pathRecords[NRC_MAX_TRAINING_RR_BOUNCES + NRC_MAX_INFERENCE_BOUNCES + NRC_MAX_TRAINING_BOUNCES];
+float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path)
 {
     logPathVertex();
     NRCPathType pathType = getNRCPathType();
     path.L += sd.emissive;
 
-    const uint kIterationCount = kMaxBounces + 1;
+    const uint kInferencePathLength = NRC_MAX_TRAINING_BOUNCES;
+    bool normalTerminate = true;
 
     /* inference loop! */
     [loop]
-    for (uint depth = 0; depth < kIterationCount; depth++)
+    for (uint depth = 0; depth < kInferencePathLength; depth++)
     {
+        {   // do a training sample snapshot here
+            pathRecords[path.length] = generatePathVertexRecord(path);
+        }
+
         uint lobes = pt.standardMaterial.getBSDFLobes(sd);
         bool supportsNEE = (lobes & (uint)LobeType::DiffuseReflection) != 0 || (lobes & (uint)LobeType::SpecularReflection) != 0;
 
@@ -382,7 +386,7 @@ void tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path)
 
         // Generate next path segment. (Do BSDF importance sampling and update shading data & path data)
         // Here, the PathData scattering direction, throughput, and BxDF sampling pdf are updated.
-        if (!generateScatterRay(pt.params, sd, pt.standardMaterial, path, path.sg)) return;
+        if (!generateScatterRay(pt.params, sd, pt.standardMaterial, path, path.sg)) { normalTerminate = false; break; }
 
         // Scatter the ray footprint out of the surface. Primary bounce is handled at footprint creation time.
         if (depth > 0)
@@ -398,79 +402,86 @@ void tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path)
             || path.nonSpecularBounces > kMaxNonSpecularBounces;
 
         // Terminate if this is the last path vertex and light sampling already completely sampled incident radiance.
-        if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) return;
-        if (kDisableCaustics && path.isSpecular() && path.nonSpecularBounces > 0) return;
-        if (!traceScatterRay(path.origin, path.dir, path.interiorList, path.hit)) return;
+        if (isQueryVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) { normalTerminate = false; break; }
+        if (kDisableCaustics && path.isSpecular() && path.nonSpecularBounces > 0) { normalTerminate = false; break; }
+        if (!traceScatterRay(path.origin, path.dir, path.interiorList, path.hit)) { normalTerminate = false; break; }
 
         const bool validHit = path.hit.isValid();
 
         if (validHit)
         {   // Handle current intersection, update path data & shading data for next scatter. Here the emissive radiance is added to path contribution.
+            // also the length of the path is increased here
             handleHit(pt, sd, path);
         }
         else
         {   // add MIS weighted contribution from environment map.
+            normalTerminate = false;
             handleMiss(pt, path);
         }
 
-        if (isQueryVertex)
-        {
-            // we use these infomation to query the nrc, note that self emission is excluded from the prediction
-            // the origin of the next bounce is updated in HandleHit
-            // the direction is generated at the previous GenerateScatterRay call
-            float3 scatterDir = -path.dir;
-            float3 scatterOrigin = path.origin;
-            float3 throughput = validHit ? path.thp : float3(0.0);       // the path throughput is updated in generate scatter ray.
-            float3 bias = path.L;               // the L already contains the self emission at the hit vertex
-            writeInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
-            break;
-        }
-
-        if (!validHit) break;
+        if (isQueryVertex) break;
+        if (!validHit) break;  
     }
 
-    /* Path enlongation! (for RR or terminate heuristic) */
-    if (pathType == NRCPathType::InferencePath) return;
-    // save outputs at the query vertex
-    float4 queryRadiance = path.L;
+    { 
+        // we use these infomation to query the nrc, note that self emission is excluded from the prediction
+        // the origin of the next bounce is updated in HandleHit
+        // the direction is generated at the previous GenerateScatterRay call
+        float3 scatterDir = -path.dir;
+        float3 scatterOrigin = path.origin;
+        float3 throughput = normalTerminate ? path.thp : float3(0.0);       // the path throughput is updated in generate scatter ray.
+        float3 bias = path.L;               // the L already contains the self emission at the hit vertex
+        writeScreenInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
+    }
 
-    const uint kTrainingSuffixLength = pathType == NRCPathType::TrainingPathRR ? 10 : 5;
+    float3 queryRadiance = path.L;
+    if (!normalTerminate) return queryRadiance;   // we don't need to query the NRC...
+    /* Path enlongation! (for RR or terminate heuristic) */
+    if (pathType == NRCPathType::InferencePath) return queryRadiance;
+    // save outputs at the query vertex
+
+    // basically, if we needs to query the NRC, we use this flag and adds a query to the structured buffer.
+    bool needsQuery = pathType == NRCPathType::TrainingPath;
+    const uint kTrainingSuffixLength = pathType == NRCPathType::TrainingPathRR ?
+        NRC_MAX_TRAINING_RR_BOUNCES : NRC_MAX_INFERENCE_BOUNCES;
     [loop]
     for(uint depth = 0; depth < kTrainingSuffixLength; depth++)
     {
+        {   // do a training sample snapshot here
+            pathRecords[path.length] = generatePathVertexRecord(path);
+        }
         uint lobes = pt.standardMaterial.getBSDFLobes(sd);
         bool supportsNEE = (lobes & (uint)LobeType::DiffuseReflection) != 0 || (lobes & (uint)LobeType::SpecularReflection) != 0;
 
         if (kUseNEE && supportsNEE && (kUseLightsInDielectricVolumes || !path.isInsideVolume()))
         {
-            // NEE samples the emissive triangles | light sources | environment map, adds its contribution to path.L 
             evalDirect(pt, sd, path);
+        }
+
+        if (pathType == NRCPathType::TrainingPathRR)
+        {
+            float u = sampleNext1D(path.sg);
+            if (u < pt.params.probabilityAbsorption) break;
+            path.thp /= (1.f - pt.params.probabilityAbsorption);
         }
 
         // Save incoming ray direction for ray footprint.
         const float3 rayDirIn = path.dir;
 
-        // Generate next path segment. (Do BSDF importance sampling and update shading data & path data)
-        // Here, the PathData scattering direction, throughput, and BxDF sampling pdf are updated.
-        if (!generateScatterRay(pt.params, sd, pt.standardMaterial, path, path.sg)) return;
-
-        // Scatter the ray footprint out of the surface. Primary bounce is handled at footprint creation time.
+        if (!generateScatterRay(pt.params, sd, pt.standardMaterial, path, path.sg)) { needsQuery = false; break; };
         if (depth > 0)
         {
             path.rayFootprint.bounceOnSurface(v, triangleVertices, path.hit.getTriangleHit(), sd, v.normalW, rayDirIn, path.dir, path.isSpecular(), path.isTransmission());
         }
-
-        // Update ray origin on transmissive events.
+        
         if (path.isTransmission()) path.origin = path.transmissionOrigin;
 
-        const bool isQueryVertex = false /*ray footprint heuristic*/
-            || path.length == NRC_MAX_INFERENCE_BOUNCES
+        const bool isLastVertex = path.length == NRC_MAX_INFERENCE_BOUNCES
             || path.nonSpecularBounces > kMaxNonSpecularBounces;
 
-        // Terminate if this is the last path vertex and light sampling already completely sampled incident radiance.
-        if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) return;
-        if (kDisableCaustics && path.isSpecular() && path.nonSpecularBounces > 0) return;
-        if (!traceScatterRay(path.origin, path.dir, path.interiorList, path.hit)) return;
+        if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) { needsQuery = false; break; }
+        if (kDisableCaustics && path.isSpecular() && path.nonSpecularBounces > 0) { needsQuery = false; break; }
+        if (!traceScatterRay(path.origin, path.dir, path.interiorList, path.hit)) { needsQuery = false; break; }
 
         const bool validHit = path.hit.isValid();
 
@@ -481,23 +492,21 @@ void tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path)
         else
         {   // add MIS weighted contribution from environment map.
             handleMiss(pt, path);
-        }
-
-        if (isQueryVertex)
-        {
-            // we use these infomation to query the nrc, note that self emission is excluded from the prediction
-            // the origin of the next bounce is updated in HandleHit
-            // the direction is generated at the previous GenerateScatterRay call
-            float3 scatterDir = -path.dir;
-            float3 scatterOrigin = path.origin;
-            float3 throughput = validHit ? path.thp : float3(0.0);       // the path throughput is updated in generate scatter ray.
-            float3 bias = path.L;               // the L already contains the self emission at the hit vertex
-            writeInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
-            break;
+            needsQuery = false;
         }
 
         if (!validHit) break;
     }
 
-    path.L = queryRadiance;
+    int queryIndex = needsQuery ? addTrainingQuery(path.origin, -path.dir) : -1;
+
+    for(uint i = 0; i < path.length; i++) {
+        // from 0 to length-1 is indeed the best choice, for either [end with RR] or [missed] or [max bounces limit reached]
+        // however, when [missed] the length-th record could actually be used.
+        float3 sampleL = (path.L - pathRecords[i].L) / pathRecords[i].thp;
+        float3 sampleFactor = path.thp / pathRecords[i].thp;
+        addTrainingSample(sampleFactor, sampleL, queryIndex);   
+    }
+
+    return queryRadiance;
 }
