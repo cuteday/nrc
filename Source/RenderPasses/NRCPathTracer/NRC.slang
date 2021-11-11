@@ -1,5 +1,5 @@
-import Utils.Math.MathHelpers;
 import Scene.ShadingData;
+import Utils.Math.MathHelpers;
 import RenderPasses.Shared.PathTracer.PathData;
 
 #ifndef NRC_MAX_TRAINING_BOUNCES
@@ -118,7 +118,7 @@ bool isTrainingPath()
 //bool isTrainingPathRR(uint2 pixel)
 bool isTrainingPathRR()
 {
-    uint2 rel_coord = gNRCPixel- gNRCTrainingPathOffset;
+    uint2 rel_coord = gNRCPixel - gNRCTrainingPathOffset;
     uint2 rel_index = rel_coord % gNRCTrainingPathStrideRR;
     if (all(rel_index == 0))
         return true;

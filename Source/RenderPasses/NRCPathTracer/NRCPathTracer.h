@@ -2,6 +2,7 @@
 #include "Falcor.h"
 #include "RenderPasses/Shared/PathTracer/PathTracer.h"
 #include "NRC.h"
+#include "Debug/NRCPixelStats.h"
 
 using namespace Falcor;
 
@@ -24,6 +25,7 @@ public:
 
     virtual std::string getDesc() override { return sDesc; }
     virtual void setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene) override;
+    virtual void renderUI(Gui::Widgets& widget) override;
     virtual void execute(RenderContext* pRenderContext, const RenderData& renderData) override;
 
     static const char* sDesc;
@@ -44,6 +46,7 @@ private:
     struct
     {
         RtProgram::SharedPtr pProgram;
+        NRCPixelStats::SharedPtr pNRCPixelStats;
         RtBindingTable::SharedPtr pBindingTable;
         RtProgramVars::SharedPtr pVars;
         ParameterBlock::SharedPtr pParameterBlock;      ///< ParameterBlock for all data.
@@ -52,9 +55,12 @@ private:
     // Neural radiance cache parameters and data fields
     struct {
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
+
+        bool enableNRC = false;
         uint2 trainingPathStride = uint2(6, 6);
         uint2 trainingPathStrideRR = uint2(24 * 24);
         float prob_rr_suffix_absorption = 0.2f;
+        float terminate_footprint_thres = 50.f;
         uint max_inference_query_size = 1920 * 1080;
         uint max_training_query_size = 1920 * 1080 / 36;
         uint max_training_record_size = 1920 * 1080 / 36 * 10;

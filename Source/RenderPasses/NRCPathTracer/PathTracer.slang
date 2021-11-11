@@ -19,6 +19,7 @@ __exported import RenderPasses.Shared.PathTracer.RayFootprint;
 __exported import Utils.Debug.PixelDebug;
 
 __exported import NRC;
+__exported import Debug.NRCPixelStats;
 
 static const bool kForceOpaque = !kUseAlphaTest;
 

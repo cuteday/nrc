@@ -8,6 +8,9 @@
     <ClCompile Include="FalcorCUDA.cpp">
       <Filter>CUDA</Filter>
     </ClCompile>
+    <ClCompile Include="Debug\NRCPixelStats.cpp">
+      <Filter>Debug</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NRCPathTracer.h" />
@@ -20,11 +23,20 @@
     <ClInclude Include="Network.h">
       <Filter>NN</Filter>
     </ClInclude>
+    <ClInclude Include="Debug\NRCPixelStats.h">
+      <Filter>Debug</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ShaderSource Include="PathTracer.rt.slang" />
     <ShaderSource Include="PathTracer.slang" />
     <ShaderSource Include="NRC.slang" />
+    <ShaderSource Include="Debug\NRCPixelStats.slang">
+      <Filter>Debug</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Debug\NRCPixelStatsShared.slang">
+      <Filter>Debug</Filter>
+    </ShaderSource>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="NN">
@@ -32,6 +44,9 @@
     </Filter>
     <Filter Include="CUDA">
       <UniqueIdentifier>{e7610912-87d3-4c65-9daa-30e1274ab051}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Debug">
+      <UniqueIdentifier>{fd716e4b-bd1f-4dc5-91b4-8ced1d758853}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -50,6 +50,8 @@ NRCPathTracer::SharedPtr NRCPathTracer::create(RenderContext* pRenderContext, co
 NRCPathTracer::NRCPathTracer(const Dictionary& dict)
     : PathTracer(dict, kOutputChannels)
 {
+    mTracer.pNRCPixelStats = NRCPixelStats::create();
+    assert(mTracer.pNRCPixelStats);
 }
 
 /* under testing process */
@@ -85,12 +87,15 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
         if (mNRC.pInferenceRadiaceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: inference query");
     }
-    //pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
+    pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
+    pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceRecord, 0);
+    mTracer.pNRCPixelStats->beginFrame(pRenderContext, renderData.getDefaultTextureDims());
     return state;
 }
 
 void NRCPathTracer::endFrame(RenderContext* pRenderContext, const RenderData& renderData)
 {
+    mTracer.pNRCPixelStats->endFrame(pRenderContext);
     PathTracer::endFrame(pRenderContext, renderData);
 }
 
@@ -130,6 +135,16 @@ void NRCPathTracer::setScene(RenderContext* pRenderContext, const Scene::SharedP
         sbt->setHitGroupByType(kRayTypeShadow, mpScene, Scene::GeometryType::TriangleMesh, desc.addHitGroup("", "shadowAnyHit"));
 
         mTracer.pProgram = RtProgram::create(desc);
+    }
+}
+
+void NRCPathTracer::renderUI(Gui::Widgets& widget)
+{
+    PathTracer::renderUI(widget);
+    widget.checkbox("Enable NRC", mNRC.enableNRC);
+    if (auto logGroup = widget.group("NRC Debug")) {
+        // widget.group creates a sub widget.
+        mTracer.pNRCPixelStats->renderUI(logGroup);
     }
 }
 
@@ -247,11 +262,12 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     // NRC related testing process
     auto pVars = mTracer.pVars;
     // width * height
-    pVars["NRCDataCB"]["gNRCEnable"] = false;
+    pVars["NRCDataCB"]["gNRCEnable"] = mNRC.enableNRC;
     pVars["NRCDataCB"]["gNRCScreenSize"] = renderData.getDefaultTextureDims();
     pVars["NRCDataCB"]["gNRCTrainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.x,
         std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.y);
     pVars["NRCDataCB"]["gNRCTrainingPathStride"] = mNRC.trainingPathStride;
     pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = mNRC.trainingPathStrideRR;
+    pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;
+    pVars["NRCDataCB"]["gTerminateFootprintThres"] = mNRC.terminate_footprint_thres;
 }
-

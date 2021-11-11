@@ -25,9 +25,11 @@
     <Import Project="..\..\Falcor\Falcor.props" />
   </ImportGroup>
   <ItemGroup>
+    <ClCompile Include="Debug\NRCPixelStats.cpp" />
     <ClCompile Include="NRCPathTracer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Debug\NRCPixelStats.h" />
     <ClInclude Include="FalcorCUDA.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="NRC.h" />
@@ -42,6 +44,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ShaderSource Include="Debug\NRCPixelStats.slang" />
+    <ShaderSource Include="Debug\NRCPixelStatsShared.slang" />
     <ShaderSource Include="NRC.slang" />
     <ShaderSource Include="PathTracer.rt.slang" />
     <ShaderSource Include="PathTracer.slang" />
