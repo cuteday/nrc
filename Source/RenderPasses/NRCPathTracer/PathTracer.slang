@@ -285,7 +285,7 @@ float3 tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
     path.L += sd.emissive;
 
     // We always add one bounce for handling surfaces that cannot be handled using light sampling.
-    const uint kIterationCount = kMaxBounces + 1;
+    uint kIterationCount = kMaxBounces + 1;
 
     [loop]
     for (uint depth = 0; depth < kIterationCount; depth++)
@@ -363,6 +363,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
 
     const uint kInferencePathLength = NRC_MAX_TRAINING_BOUNCES;
     bool normalTerminate = true;
+    NRCRayFootprint inferenceRayFootprint = { 0.0 };
 
     /* inference loop! */
     [loop]
@@ -370,6 +371,8 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     {
         {   // do a training sample snapshot here
             pathRecords[path.length] = generatePathVertexRecord(path);
+            // calculate and update ray footprint for termination heuristic
+            inferenceRayFootprint.nextBounce(path.origin, sd.posW, path.pdf, sd.NdotV);
         }
 
         uint lobes = pt.standardMaterial.getBSDFLobes(sd);
@@ -397,7 +400,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         // Update ray origin on transmissive events.
         if (path.isTransmission()) path.origin = path.transmissionOrigin;
 
-        const bool isQueryVertex = false /*ray footprint heuristic*/
+        const bool isQueryVertex = inferenceRayFootprint.terminate() /*ray footprint heuristic*/
             || path.length == NRC_MAX_INFERENCE_BOUNCES
             || path.nonSpecularBounces > kMaxNonSpecularBounces;
 
@@ -441,6 +444,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     // save outputs at the query vertex
 
     // basically, if we needs to query the NRC, we use this flag and adds a query to the structured buffer.
+    NRCRayFootprint suffixRayFootprint = { 0.0 };
     bool needsQuery = pathType == NRCPathType::TrainingPath;
     const uint kTrainingSuffixLength = pathType == NRCPathType::TrainingPathRR ?
         NRC_MAX_TRAINING_RR_BOUNCES : NRC_MAX_INFERENCE_BOUNCES;
@@ -449,6 +453,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     {
         {   // do a training sample snapshot here
             pathRecords[path.length] = generatePathVertexRecord(path);
+            suffixRayFootprint.nextBounce(path.origin, sd.posW, path.pdf, sd.NdotV);
         }
         uint lobes = pt.standardMaterial.getBSDFLobes(sd);
         bool supportsNEE = (lobes & (uint)LobeType::DiffuseReflection) != 0 || (lobes & (uint)LobeType::SpecularReflection) != 0;
@@ -476,7 +481,8 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         
         if (path.isTransmission()) path.origin = path.transmissionOrigin;
 
-        const bool isLastVertex = path.length == NRC_MAX_INFERENCE_BOUNCES
+        const bool isLastVertex = (needsQuery && suffixRayFootprint.terminate())
+            || path.length == NRC_MAX_INFERENCE_BOUNCES
             || path.nonSpecularBounces > kMaxNonSpecularBounces;
 
         if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) { needsQuery = false; break; }

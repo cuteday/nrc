@@ -1,4 +1,5 @@
 import Utils.Math.MathHelpers;
+import Scene.ShadingData;
 import RenderPasses.Shared.PathTracer.PathData;
 
 #ifndef NRC_MAX_TRAINING_BOUNCES
@@ -14,6 +15,8 @@ import RenderPasses.Shared.PathTracer.PathData;
 cbuffer NRCDataCB
 {   // the constant buffer is globally shared between shader files which included this file
     bool gNRCEnable;
+    float gNRCAbsorptionProb;
+    float gTerminateFootprintThres;      // hyperparam for ray termination heuristic
     uint2 gNRCScreenSize;               // width x height
     uint2 gNRCTrainingPathStride;       // uniform sparse sample paths for training
     uint2 gNRCTrainingPathOffset;       // random offset each frame, for the sparse sample
@@ -25,6 +28,22 @@ enum NRCPathType
     InferencePath   = 0,
     TrainingPath    = 1,
     TrainingPathRR  = 2
+};
+
+struct NRCRayFootprint{
+    float spread;
+
+    NRCRayFootprint nextBounce(float3 u, float3 v, float pdf, float NdotV)
+    { 
+        NdotV = max(NdotV, 0.01);
+        float current = distance(u, v) / pdf / NdotV;
+        return { spread + current };
+    }
+
+    bool terminate()
+    {
+        return spread > gTerminateFootprintThres;
+    }
 };
 
 static uint2 gNRCPixel;
@@ -89,7 +108,7 @@ NRCPathType getNRCPathType()
 //bool isTrainingPath(uint2 pixel)
 bool isTrainingPath()
 {
-    uint2 rel_coord = gNRCPixel- gNRCTrainingPathOffset;
+    uint2 rel_coord = gNRCPixel - gNRCTrainingPathOffset;
     uint2 rel_index = rel_coord % gNRCTrainingPathStride;
     if (all(rel_index == 0))
         return true;
@@ -128,11 +147,13 @@ int addTrainingQuery(float3 pos, float3 dir)
     int idx = gTrainingRadianceQuery.IncrementCounter();
     RadianceQuery query = { pos, world_to_latlong_map(dir) };
     gTrainingRadianceQuery[idx] = query;
+    return idx;
 }
 
-void addTrainingSample(int a, int b, int queryIndex)
+void addTrainingSample(float3 a, float3 b, int queryIndex)
 {
     int idx = gTrainingRadianceRecord.IncrementCounter();
-    RadianceRecord record = { a, b, queryIndex};
+    RadianceSample record = { a, b, queryIndex};
     gTrainingRadianceRecord[idx] = record;
 }
+

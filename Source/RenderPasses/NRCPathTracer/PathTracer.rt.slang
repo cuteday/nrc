@@ -12,9 +12,6 @@ import PathTracer;
 import Utils.Timing.GpuTimer;
 import RenderPasses.Shared.PathTracer.LoadShadingData;
 
-// Neural networks related
-//__exported import NRC;
-
 ParameterBlock<PathTracerData> gData;
 
 // Outputs (optional)
@@ -145,8 +142,7 @@ void rayGen()
 
             // Trace the path.
             float3 L;
-            if (gNRCEnable)
-                L = tracePathNRC(gData, sd, path);
+            if (gNRCEnable) L = tracePathNRC(gData, sd, path);
             else L = tracePath(gData, sd, path);
 
             logPathLength(path.length);

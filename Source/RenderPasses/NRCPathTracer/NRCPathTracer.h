@@ -54,6 +54,7 @@ private:
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
         uint2 trainingPathStride = uint2(6, 6);
         uint2 trainingPathStrideRR = uint2(24 * 24);
+        float prob_rr_suffix_absorption = 0.2f;
         uint max_inference_query_size = 1920 * 1080;
         uint max_training_query_size = 1920 * 1080 / 36;
         uint max_training_record_size = 1920 * 1080 / 36 * 10;

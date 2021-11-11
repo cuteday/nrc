@@ -119,7 +119,7 @@ void NRCPathTracer::setScene(RenderContext* pRenderContext, const Scene::SharedP
         assert(mNRC.max_training_rr_bounces >= mNRC.max_training_bounces);
         desc.addDefine("NRC_MAX_TRAINING_BOUNCES", std::to_string(mNRC.max_training_bounces));
         desc.addDefine("NRC_MAX_TRAINING_RR_BOUNCES", std::to_string(mNRC.max_training_rr_bounces));
-        desc.addDefine("NRC_MAX_INFERENCE_BOUNCES", std::to_string(mNRC.maximum_inference_buffer_size));
+        desc.addDefine("NRC_MAX_INFERENCE_BOUNCES", std::to_string(mNRC.max_inference_bounces));
 
         mTracer.pBindingTable = RtBindingTable::create(2, 2, mpScene->getGeometryCount());
         auto& sbt = mTracer.pBindingTable;
