@@ -142,10 +142,19 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
 {
     PathTracer::renderUI(widget);
     widget.checkbox("Enable NRC", mNRC.enableNRC);
-    if (auto logGroup = widget.group("NRC Debug")) {
-        // widget.group creates a sub widget.
-        mTracer.pNRCPixelStats->renderUI(logGroup);
+    if(mNRC.enableNRC){
+        if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
+            ||widget.var("Max training suffix bounces", mNRC.max_training_bounces, 3, 15, 1)     
+            ||widget.var("Max RR suffix bounces", mNRC.max_training_rr_bounces, 3, 15, 1)) {
+            mOptionsChanged = true;
+        }
+        widget.var("Terminate heuristic threshold", mNRC.terminate_footprint_thres, 0.f, 60.f, 0.01);
+        if (auto logGroup = widget.group("NRC Debug")) {
+            // widget.group creates a sub widget.
+            mTracer.pNRCPixelStats->renderUI(logGroup);
+        }
     }
+
 }
 
 void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& renderData)
@@ -198,11 +207,22 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
 
     mpPixelDebug->prepareProgram(pProgram, mTracer.pVars->getRootVar());
     mpPixelStats->prepareProgram(pProgram, mTracer.pVars->getRootVar());
+    mTracer.pNRCPixelStats->prepareProgram(pProgram, mTracer.pVars->getRootVar());
 
     // Spawn the rays.
     {
         PROFILE("NRCPathTracer::execute()_RayTrace");
         mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim, 1));
+        /*for (int i = 0; i < 1; i++)
+            mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim.x / 6, targetDim.y / 6, 1));*/
+    }
+
+    // Train and inference the network
+    {
+        PROFILE("NRCPathTracer::Inference");
+    }
+    {
+        PROFILE("NRCPathTracer::Training");
     }
 
     // Call shared post-render code.

@@ -90,6 +90,10 @@ void RTLightingPass::execute(RenderContext* pRenderContext, const RenderData& re
     for (auto& channel : kInputChannels)bind(channel);
     for (auto& channel : kOutputChannels)bind(channel);
 
+    if (mUseMonteCarloShading)
+        mpProgram->addDefine("SHADING_MONTE_CARLO");
+    else mpProgram->removeDefine("SHADING_MONTE_CARLO");
+
     const uint2 targetDim = renderData.getDefaultTextureDims();
     assert(targetDim.x > 0 && targetDim.y > 0);
     mpScene->raytrace(pRenderContext, mpProgram.get(), mpProgramVars, uint3(targetDim, 1));
@@ -99,11 +103,13 @@ void RTLightingPass::execute(RenderContext* pRenderContext, const RenderData& re
 void RTLightingPass::renderUI(Gui::Widgets& widget)
 {
     widget.text("Hello DXR lighting!");
+    widget.checkbox("Use Monte Carlo shading", mUseMonteCarloShading);
     widget.var("Minimum ray distance", mMinT, 0.0f, 0.02f, 0.0001f);
-    widget.var("Direct lighting sample count", mDirectSampleCount, 0u, 64u, 1);
-    widget.tooltip("Average weighting these direct samples, 0 means sampling each light once");
+    if (mUseMonteCarloShading) {
+        widget.var("Direct lighting sample count", mDirectSampleCount, 0u, 64u, 1);
+        widget.tooltip("Average weighting these direct samples, 0 means sampling each light once");
+    }
 }
-
 void RTLightingPass::setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene)
 {
     mpProgram = nullptr;

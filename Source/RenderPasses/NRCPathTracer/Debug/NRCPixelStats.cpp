@@ -48,8 +48,8 @@ namespace Falcor
                 mpStatsInferencePathLength = Texture::create2D(frameDim.x, frameDim.y, ResourceFormat::R32Uint, 1, 1, nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
                 mpStatsSuffixPathLength = Texture::create2D(frameDim.x, frameDim.y, ResourceFormat::R32Uint, 1, 1, nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
             }
-            pRenderContext->clearUAV(mpStatsSuffixPathLength->getUAV().get(), uint4(0, 0, 0, 0));
-            pRenderContext->clearUAV(mpStatsInferencePathLength->getUAV().get(), uint4(0, 0, 0, 0));
+            pRenderContext->clearUAV(mpStatsSuffixPathLength->getUAV().get(), uint4(0));
+            pRenderContext->clearUAV(mpStatsInferencePathLength->getUAV().get(), uint4(0));
         }
     }
 
@@ -65,8 +65,8 @@ namespace Falcor
 
             // the parallel reduction uses a compute shader to execute computation.
             // note that *result pointer argument also needs to map from GPU memory to cpu (not a faster method...)
-            mpParallelReduction->execute<uint4>(pRenderContext, mpStatsInferencePathLength, ComputeParallelReduction::Type::Sum, nullptr, mpReductionResult, 1 * sizeof(uint4));
-            mpParallelReduction->execute<uint4>(pRenderContext, mpStatsSuffixPathLength, ComputeParallelReduction::Type::Sum, nullptr, mpReductionResult, 0 * sizeof(uint4));
+            mpParallelReduction->execute<uint4>(pRenderContext, mpStatsInferencePathLength, ComputeParallelReduction::Type::Sum, nullptr, mpReductionResult, 0 * sizeof(uint4));
+            mpParallelReduction->execute<uint4>(pRenderContext, mpStatsSuffixPathLength, ComputeParallelReduction::Type::Sum, nullptr, mpReductionResult, 1 * sizeof(uint4));
 
             // Submit command list and insert signal.
             pRenderContext->flush(false);
@@ -170,15 +170,15 @@ namespace Falcor
         }
     }
 
-    //pybind11::dict NRCPixelStats::Stats::toPython() const
-    //{
-    //    pybind11::dict d;
+    pybind11::dict NRCPixelStats::Stats::toPython() const
+    {
+        pybind11::dict d;
 
-    //    d["avgInferencePathLength"] = avgInferencePathLength;
-    //    d["avgSuffixPathLength"] = avgSuffixPathLength;
+        d["avgInferencePathLength"] = avgInferencePathLength;
+        d["avgSuffixPathLength"] = avgSuffixPathLength;
 
-    //    return d;
-    //}
+        return d;
+    }
 
     //SCRIPT_BINDING(NRCPixelStats)
     //{

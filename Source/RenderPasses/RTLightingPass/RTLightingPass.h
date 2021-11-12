@@ -34,6 +34,7 @@ private:
     float mMinT = 0.0001f;
     uint mDirectSampleCount = 4;
     uint mFrameCount = 0;
+    bool mUseMonteCarloShading = true;
 
     Scene::SharedPtr mpScene = nullptr;
     EnvMapLighting::SharedPtr mpEnvMapLighting;

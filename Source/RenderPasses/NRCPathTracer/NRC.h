@@ -34,12 +34,14 @@ namespace NRC {
 
         NRCInterface();
 
-        void trainFrame();
+        void trainFrame(Falcor::Buffer::SharedPtr pTrainingRadianceQueryBuffer,
+            Falcor::Buffer::SharedPtr pTrainingRadianceRecordBuffer);
 
-        void inferenceFrame();
+        void inferenceFrame(Falcor::Buffer::SharedPtr pInferenceRadianceQueryTexture,
+            Falcor::Texture::SharedPtr pScreenQueryFactorTexture,
+            Falcor::Texture::SharedPtr pScreenQueryBiasTexture);
 
     private:
-
         NRCNetwork::SharedPtr network = nullptr;
     };
 }

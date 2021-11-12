@@ -96,6 +96,7 @@ void rayGen()
 
     logSetPixel(launchIndex);
     printSetPixel(launchIndex);
+    logSetPixelNRC(launchIndex);
     NRCSetPixel(launchIndex);
 
     GpuTimer timer;

@@ -74,8 +74,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FLIPPass", "Source\RenderPa
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OptixDenoiser", "Source\RenderPasses\OptixDenoiser\OptixDenoiser.vcxproj", "{05555565-706C-4633-BF8A-B99F96F2B301}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Experiments", "Experiments", "{911B500C-B1BD-4E98-AD9E-2B1B4CED39E8}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tools", "Tools", "{77D1D719-70BE-4F19-A92F-9661F4085D75}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderGraphEditor", "Source\Tools\RenderGraphEditor\RenderGraphEditor.vcxproj", "{DE81ACAA-933F-4DBC-A7EB-D69B9CB0BA71}"

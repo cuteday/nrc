@@ -285,8 +285,11 @@ float3 tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
     // Always output directly emitted light from the primary hit.
     path.L += sd.emissive;
 
+    const uint maxBounces = isTrainingPath() ? kMaxBounces * 5: kMaxBounces * 5;
+    const uint maxNonSpecularBounces = isTrainingPath() ? kMaxNonSpecularBounces * 5 : kMaxNonSpecularBounces * 5;
+
     // We always add one bounce for handling surfaces that cannot be handled using light sampling.
-    uint kIterationCount = kMaxBounces + 1;
+    uint kIterationCount = maxBounces + 1;
 
     [loop]
     for (uint depth = 0; depth < kIterationCount; depth++)
@@ -326,7 +329,7 @@ float3 tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
         // Update ray origin on transmissive events.
         if (path.isTransmission()) path.origin = path.transmissionOrigin;
 
-        const bool isLastVertex = path.length == kMaxBounces || path.nonSpecularBounces > kMaxNonSpecularBounces;
+        const bool isLastVertex = path.length == maxBounces || path.nonSpecularBounces > maxNonSpecularBounces;
 
         // Terminate if this is the last path vertex and light sampling already completely sampled incident radiance.
         if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) break;
@@ -438,11 +441,14 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         writeScreenInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
     }
 
-    float3 queryRadiance = path.L;
+    const float3 queryRadiance = path.L;
+    const uint inferencePathLength = path.length;
+    logInferencePathLength(inferencePathLength);
     if (!normalTerminate) return queryRadiance;   // we don't need to query the NRC...
     /* Path enlongation! (for RR or terminate heuristic) */
     if (pathType == NRCPathType::InferencePath) return queryRadiance;
     // save outputs at the query vertex
+    return queryRadiance;
 
     // basically, if we needs to query the NRC, we use this flag and adds a query to the structured buffer.
     NRCRayFootprint suffixRayFootprint = { 0.0 };
@@ -505,6 +511,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         if (!validHit) break;
     }
 
+    logSuffixPathLength(path.length - inferencePathLength);
     int queryIndex = needsQuery ? addTrainingQuery(path.origin, -path.dir) : -1;
 
     for(uint i = 0; i < path.length; i++) {

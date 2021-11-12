@@ -19,7 +19,7 @@ namespace Falcor
             float    avgInferencePathLength = 0.f;
             float    avgSuffixPathLength = 0.f;
 
-            //pybind11::dict toPython() const;
+            pybind11::dict toPython() const;
         };
 
         using SharedPtr = std::shared_ptr<NRCPixelStats>;
