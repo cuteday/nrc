@@ -148,7 +148,7 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
             ||widget.var("Max RR suffix bounces", mNRC.max_training_rr_bounces, 3, 15, 1)) {
             mOptionsChanged = true;
         }
-        widget.var("Terminate heuristic threshold", mNRC.terminate_footprint_thres, 0.f, 60.f, 0.01);
+        widget.var("Terminate heuristic threshold", mNRC.terminate_footprint_thres, 0.f, 60.f, 0.01f);
         if (auto logGroup = widget.group("NRC Debug")) {
             // widget.group creates a sub widget.
             mTracer.pNRCPixelStats->renderUI(logGroup);
@@ -205,26 +205,31 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
     const uint2 targetDim = renderData.getDefaultTextureDims();
     assert(targetDim.x > 0 && targetDim.y > 0);
 
-    mpPixelDebug->prepareProgram(pProgram, mTracer.pVars->getRootVar());
-    mpPixelStats->prepareProgram(pProgram, mTracer.pVars->getRootVar());
-    mTracer.pNRCPixelStats->prepareProgram(pProgram, mTracer.pVars->getRootVar());
+    auto vars = mTracer.pVars->getRootVar();
+    mpPixelDebug->prepareProgram(pProgram, vars);
+    mpPixelStats->prepareProgram(pProgram, vars);
+    mTracer.pNRCPixelStats->prepareProgram(pProgram, vars);
 
-    // Spawn the rays.
+    // Spawn the rays for inference.
     {
-        PROFILE("NRCPathTracer::execute()_RayTrace");
+        PROFILE("NRCPathTracer::execute()_RayTrace_Inference");
         mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim, 1));
-        /*for (int i = 0; i < 1; i++)
-            mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim.x / 6, targetDim.y / 6, 1));*/
     }
-
-    // Train and inference the network
-    {
-        PROFILE("NRCPathTracer::Inference");
+    // "Enlong" the training suffix
+    if (mNRC.enableNRC) {
+        {
+            PROFILE("NRCPathTracer::execute()_RayTrace_TrainingSuffix");
+            mTracer.pVars["NRCDataCB"]["gIsTrainingPass"] = true;
+            mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim.x / 6, targetDim.y / 6, 1));
+        }
+        // Train and inference the network
+        {
+            PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
+        }
+        {
+            PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
+        }
     }
-    {
-        PROFILE("NRCPathTracer::Training");
-    }
-
     // Call shared post-render code.
     endFrame(pRenderContext, renderData);
 }
@@ -283,6 +288,7 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     auto pVars = mTracer.pVars;
     // width * height
     pVars["NRCDataCB"]["gNRCEnable"] = mNRC.enableNRC;
+    pVars["NRCDataCB"]["gIsTrainingPass"] = false;      // reset this flag for next frame
     pVars["NRCDataCB"]["gNRCScreenSize"] = renderData.getDefaultTextureDims();
     pVars["NRCDataCB"]["gNRCTrainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.x,
         std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.y);

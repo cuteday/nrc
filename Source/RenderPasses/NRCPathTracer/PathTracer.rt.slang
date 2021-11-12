@@ -91,13 +91,13 @@ void shadowAnyHit(inout ShadowRayData rayData : SV_RayPayload, BuiltInTriangleIn
 [shader("raygeneration")]
 void rayGen()
 {
-    uint2 launchIndex = DispatchRaysIndex().xy;
-    uint2 launchDim = DispatchRaysDimensions().xy;
+    uint2 currentPixel = getCurrentPixelNRC(DispatchRaysIndex().xy);
+    uint2 screenSize = gNRCScreenSize;
 
-    logSetPixel(launchIndex);
-    printSetPixel(launchIndex);
-    logSetPixelNRC(launchIndex);
-    NRCSetPixel(launchIndex);
+    logSetPixel(currentPixel);
+    printSetPixel(currentPixel);
+    logSetPixelNRC(currentPixel);
+    NRCSetPixel(currentPixel);
 
     GpuTimer timer;
     if (is_valid(gOutputTime)) timer.start();
@@ -109,12 +109,13 @@ void rayGen()
     HitInfo hit;
     ShadingData sd;
     // loads the geometry info of current pixel (primary hit) into ShadingData sd and HitInfo hit
-    if (loadShadingData(launchIndex, launchDim, gScene.camera, sd, hit))
+    if (loadShadingData(currentPixel, screenSize, gScene.camera, sd, hit))
     {
         // Pixel represents a primary hit. Compute its contribution.
 
         // Compute ray origin for new rays spawned from the G-buffer.
         const float3 rayOrigin = sd.computeNewRayOrigin();
+        const NRCPathType pathType = getNRCPathType(currentPixel);
 
         // Loop over samples in pixel.
         [loop]
@@ -128,7 +129,7 @@ void rayGen()
 
             // Create sample generator.
             uint frameSeed = gData.params.useFixedSeed ? 0 : gData.params.frameCount;
-            path.sg = SampleGenerator.create(launchIndex, frameSeed * kSamplesPerPixel + sampleIdx);
+            path.sg = SampleGenerator.create(currentPixel, frameSeed * kSamplesPerPixel + sampleIdx);
 
             // Advance the generator to the first available dimension.
             // TODO: This is potentially expensive. We may want to store/restore the state from memory if it becomes a problem.
@@ -138,13 +139,17 @@ void rayGen()
             if (!(kRayFootprintMode == TexLODMode::Mip0))
             {
                 // Create the ray footprint data for TexLOD.
-                path.rayFootprint = RayFootprint.create(hit.getTriangleHit(), launchIndex, launchDim, rayOrigin, gScene.camera.getPosition(), sd.faceN, sd.N, gData.params.screenSpacePixelSpreadAngle, sd.linearRoughness, path.isSpecular());
+                path.rayFootprint = RayFootprint.create(hit.getTriangleHit(), currentPixel, screenSize, rayOrigin, gScene.camera.getPosition(), sd.faceN, sd.N, gData.params.screenSpacePixelSpreadAngle, sd.linearRoughness, path.isSpecular());
             }
 
             // Trace the path.
             float3 L;
-            if (gNRCEnable) L = tracePathNRC(gData, sd, path);
-            else L = tracePath(gData, sd, path);
+            if (!gNRCEnable)
+                L = tracePath(gData, sd, path);
+            else if(pathType == NRCPathType::InferencePath || gIsTrainingPass)
+                // we'll skip paths which contain a training suffix at the inference pass.
+                // just a workaround, the time cost of invoking this shader still exists.
+                L = tracePathNRC(gData, sd, path);
 
             logPathLength(path.length);
 
@@ -173,9 +178,9 @@ void rayGen()
 
     // Write outputs.
     // These are all optional so using compile-time checks to decide which ones to write.
-    if (is_valid(gOutputColor)) gOutputColor[launchIndex] = float4(outColor, outAlpha);
-    if (is_valid(gOutputAlbedo)) gOutputAlbedo[launchIndex] = float4(outAlbedo, 1);
+    if (is_valid(gOutputColor)) gOutputColor[currentPixel] = float4(outColor, outAlpha);
+    if (is_valid(gOutputAlbedo)) gOutputAlbedo[currentPixel] = float4(outAlbedo, 1);
 
     // Write time.
-    if (is_valid(gOutputTime)) gOutputTime[launchIndex] = timer.getElapsed();
+    if (is_valid(gOutputTime)) gOutputTime[currentPixel] = timer.getElapsed();
 }

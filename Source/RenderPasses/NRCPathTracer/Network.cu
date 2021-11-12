@@ -60,6 +60,5 @@ namespace NRC {
         mNetworkMemory.train_target = new GPUMatrix<float>(mNetworkParams.output_dims, mNetworkParams.batch_size);
         mNetworkMemory.train_data = new GPUMatrix<float>(mNetworkParams.output_dims, mNetworkParams.batch_size);
 
-
     }
 }

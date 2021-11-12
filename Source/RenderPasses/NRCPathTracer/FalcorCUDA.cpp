@@ -70,16 +70,16 @@ namespace FalcorCUDA
         return true;
     }
 
-    cudaExternalMemory_t test_import_buffer_to_cuda(Falcor::Buffer::SharedPtr pBuffer) {
-        HANDLE sharedHandle = pBuffer->getSharedApiHandle();
+    cudaExternalMemory_t importExternalMemory(Falcor::Resource::SharedPtr pResource) {
+        HANDLE sharedHandle = pResource->getSharedApiHandle();
         if (sharedHandle == NULL) {
-            logError("CUDA::importing buffer failed");
+            logFatal("CUDA::importing resource failed");
         }
 
         cudaExternalMemoryHandleDesc externalMemoryHandleDesc = {};
         externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
         externalMemoryHandleDesc.handle.win32.handle = sharedHandle;
-        externalMemoryHandleDesc.size = pBuffer->getSize();
+        externalMemoryHandleDesc.size = pResource->getSize();
         externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
 
         cudaExternalMemory_t externalMemory;
@@ -88,14 +88,42 @@ namespace FalcorCUDA
         return externalMemory;
     }
 
-    void* mapBufferOntoExternalMemory(const cudaExternalMemory_t& externalMemory, unsigned long long size) {
+    void* mapExternalMemory(const cudaExternalMemory_t& externalMemory, unsigned long long size) {
         void* ptr = nullptr;
         cudaExternalMemoryBufferDesc desc = {};
+        
 
         desc.offset = 0;
         desc.size = size;
 
         CUDA_CHECK_SUCCESS(cudaExternalMemoryGetMappedBuffer(&ptr, externalMemory, &desc));
         return ptr;
+    }
+
+    void* importResourceToDevicePointer(Falcor::Resource::SharedPtr pResource)
+    {
+        cudaExternalMemory_t externalMemory = importExternalMemory(pResource);
+        return mapExternalMemory(externalMemory, pResource->getSize());
+    }
+
+    cudaMipmappedArray_t importTextureToMipmappedArray(Falcor::Texture::SharedPtr pTexture, uint32_t cudaUsageFlags)
+    {
+        cudaExternalMemory_t externalMemory = importExternalMemory(pTexture);
+
+        cudaExternalMemoryMipmappedArrayDesc mipDesc = {};
+        cudaMipmappedArray_t mipmappedArray;
+        auto format = pTexture->getFormat();
+        mipDesc.formatDesc.x = getNumChannelBits(format, 0);
+        mipDesc.formatDesc.y = getNumChannelBits(format, 1);
+        mipDesc.formatDesc.z = getNumChannelBits(format, 2);
+        mipDesc.formatDesc.w = getNumChannelBits(format, 3);
+        mipDesc.formatDesc.f = (getFormatType(format) == FormatType::Float) ? cudaChannelFormatKindFloat : cudaChannelFormatKindUnsigned;
+        mipDesc.extent.depth = 1;
+        mipDesc.extent.width = pTexture->getWidth();
+        mipDesc.extent.height = pTexture->getHeight();
+        mipDesc.flags = cudaUsageFlags;
+        mipDesc.numLevels = 1;
+        CUDA_CHECK_SUCCESS(cudaExternalMemoryGetMappedMipmappedArray(&mipmappedArray, externalMemory, &mipDesc));
+        return mipmappedArray;
     }
 }

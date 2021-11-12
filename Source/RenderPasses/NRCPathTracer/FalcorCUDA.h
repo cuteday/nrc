@@ -6,11 +6,12 @@
 
 namespace FalcorCUDA
 {
-    /** Initializes the CUDA driver API. Returns true if successful, false otherwise.
-    */
+    // Initializes the CUDA driver API. Returns true if successful, false otherwise.
     bool initCUDA();
 
-    cudaExternalMemory_t test_import_buffer_to_cuda(Falcor::Buffer::SharedPtr pBuffer);
-
-    void* mapBufferOntoExternalMemory(const cudaExternalMemory_t& externalMemory, unsigned long long size);
+    cudaExternalMemory_t importExternalMemory(Falcor::Resource::SharedPtr pResource);
+    void* mapExternalMemory(const cudaExternalMemory_t& externalMemory, unsigned long long size);
+    
+    void* importResourceToDevicePointer(Falcor::Resource::SharedPtr pResource);
+    cudaMipmappedArray_t importTextureToMipmappedArray(Falcor::Texture::SharedPtr pTexture, uint32_t cudaUsageFlags);
 };

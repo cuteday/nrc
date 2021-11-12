@@ -15,8 +15,9 @@ import RenderPasses.Shared.PathTracer.PathData;
 cbuffer NRCDataCB
 {   // the constant buffer is globally shared between shader files which included this file
     bool gNRCEnable;
+    bool gIsTrainingPass;               // If we are in the training pass, dispatch training suffix via sparse sampling
     float gNRCAbsorptionProb;
-    float gTerminateFootprintThres;      // hyperparam for ray termination heuristic
+    float gTerminateFootprintThres;     // hyperparam for ray termination heuristic
     uint2 gNRCScreenSize;               // width x height
     uint2 gNRCTrainingPathStride;       // uniform sparse sample paths for training
     uint2 gNRCTrainingPathOffset;       // random offset each frame, for the sparse sample
@@ -103,6 +104,13 @@ NRCPathType getNRCPathType(uint2 pixel)
 NRCPathType getNRCPathType()
 {
     return getNRCPathType(gNRCPixel);
+}
+
+uint2 getCurrentPixelNRC(uint2 launchIndex)
+{
+    if (gNRCEnable && gIsTrainingPass)
+        return gNRCTrainingPathOffset + launchIndex * gNRCTrainingPathStride;
+    return launchIndex;
 }
 
 //bool isTrainingPath(uint2 pixel)
