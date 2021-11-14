@@ -126,4 +126,20 @@ namespace FalcorCUDA
         CUDA_CHECK_SUCCESS(cudaExternalMemoryGetMappedMipmappedArray(&mipmappedArray, externalMemory, &mipDesc));
         return mipmappedArray;
     }
+
+    cudaSurfaceObject_t mapTextureToSurfaceObject(Falcor::Texture::SharedPtr pTexture, uint32_t cudaUsageFlags)
+    {
+        cudaMipmappedArray_t mipmap = importTextureToMipmappedArray(pTexture, cudaUsageFlags);
+
+        cudaArray_t cudaArray;
+        CUDA_CHECK_SUCCESS(cudaGetMipmappedArrayLevel(&cudaArray, mipmap, 0));
+
+        cudaResourceDesc resDesc = {};
+        resDesc.res.array.array = cudaArray;
+        resDesc.resType = cudaResourceTypeArray;
+
+        cudaSurfaceObject_t surface;
+        CUDA_CHECK_SUCCESS(cudaCreateSurfaceObject(&surface, &resDesc));
+        return surface;
+    }
 }

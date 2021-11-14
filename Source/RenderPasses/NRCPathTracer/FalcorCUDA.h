@@ -14,4 +14,5 @@ namespace FalcorCUDA
     
     void* importResourceToDevicePointer(Falcor::Resource::SharedPtr pResource);
     cudaMipmappedArray_t importTextureToMipmappedArray(Falcor::Texture::SharedPtr pTexture, uint32_t cudaUsageFlags);
+    cudaSurfaceObject_t mapTextureToSurfaceObject(Falcor::Texture::SharedPtr pTexture, uint32_t cudaUsageFlags);
 };

@@ -27,6 +27,7 @@ public:
     virtual void setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene) override;
     virtual void renderUI(Gui::Widgets& widget) override;
     virtual void execute(RenderContext* pRenderContext, const RenderData& renderData) override;
+    virtual RenderPassReflection reflect(const CompileData& compileData) override;
 
     static const char* sDesc;
 
@@ -68,8 +69,11 @@ private:
         int max_training_rr_bounces = 10;
         int max_inference_bounces = 5;
 
-        Buffer::SharedPtr pTrainingRadianceQuery;
-        Buffer::SharedPtr pTrainingRadianceRecord;
-        Buffer::SharedPtr pInferenceRadiaceQuery;
+        Buffer::SharedPtr pTrainingRadianceQuery = nullptr;
+        Buffer::SharedPtr pTrainingRadianceRecord = nullptr;
+        Buffer::SharedPtr pInferenceRadiaceQuery = nullptr;
+        Texture::SharedPtr pScreenQueryFactor = nullptr;
+        Texture::SharedPtr pScreenQueryBias = nullptr;
+        Texture::SharedPtr pScreenResult = nullptr;
     } mNRC;
 };

@@ -14,11 +14,11 @@ namespace NRC {
         network = NRCNetwork::SharedPtr(new NRCNetwork());
     }
 
-    void NRCInterface::trainFrame(Falcor::Buffer::SharedPtr pTrainingRadianceQueryBuffer, Falcor::Buffer::SharedPtr pTrainingRadianceRecordBuffer)
+    void NRCInterface::trainFrame()
     {
     }
 
-    void NRCInterface::inferenceFrame(Falcor::Buffer::SharedPtr pInferenceRadianceQueryTexture, Falcor::Texture::SharedPtr pScreenQueryFactorTexture, Falcor::Texture::SharedPtr pScreenQueryBiasTexture)
+    void NRCInterface::inferenceFrame()
     {
     }
 

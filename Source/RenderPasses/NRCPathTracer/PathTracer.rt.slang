@@ -144,13 +144,11 @@ void rayGen()
 
             // Trace the path.
             float3 L;
-            if (!gNRCEnable)
-                L = tracePath(gData, sd, path);
-            else if(pathType == NRCPathType::InferencePath || gIsTrainingPass)
-                // we'll skip paths which contain a training suffix at the inference pass.
-                // just a workaround, the time cost of invoking this shader still exists.
-                L = tracePathNRC(gData, sd, path);
-
+#ifdef NRC_ENABLE
+            L = tracePathNRC(gData, sd, path);
+#else
+            L = tracePath(gData, sd, path);
+#endif
             logPathLength(path.length);
 
             // Accumulate after clamping.

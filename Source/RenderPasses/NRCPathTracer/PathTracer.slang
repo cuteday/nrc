@@ -358,6 +358,9 @@ float3 tracePath(const PathTracerData pt, ShadingData sd, inout PathData path)
 static PathVertexRecord pathRecords[NRC_MAX_TRAINING_RR_BOUNCES + NRC_MAX_INFERENCE_BOUNCES + NRC_MAX_TRAINING_BOUNCES];
 float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path)
 {
+    // we'll skip paths which contain a training suffix at the inference pass.
+    // just a workaround, the time cost of invoking this shader still exists.
+
     logPathVertex();
     NRCPathType pathType = getNRCPathType();
     path.L += sd.emissive;

@@ -16,15 +16,6 @@ using Falcor::float4;
 
 namespace NRC {
 
-    struct RadianceQuery {
-        float3 pos;
-        float2 dir;
-    };
-
-    struct RadianceRecord {
-        float3 radiance;
-    };
-
     class NRCInterface {
 
     public:
@@ -34,14 +25,27 @@ namespace NRC {
 
         NRCInterface();
 
-        void trainFrame(Falcor::Buffer::SharedPtr pTrainingRadianceQueryBuffer,
-            Falcor::Buffer::SharedPtr pTrainingRadianceRecordBuffer);
+        void trainFrame();
 
-        void inferenceFrame(Falcor::Buffer::SharedPtr pInferenceRadianceQueryTexture,
-            Falcor::Texture::SharedPtr pScreenQueryFactorTexture,
-            Falcor::Texture::SharedPtr pScreenQueryBiasTexture);
+        void inferenceFrame();
+
+        void registerNRCResources(Falcor::Buffer::SharedPtr pScreenQueryBuffer,
+            Falcor::Texture::SharedPtr pScreenResultTexture) {
+            mFalcorResources.screenQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pScreenQueryBuffer);
+            mFalcorResources.screenResult = FalcorCUDA::mapTextureToSurfaceObject(pScreenResultTexture, cudaArrayColorAttachment);
+        }      
 
     private:
         NRCNetwork::SharedPtr network = nullptr;
+
+        struct {
+            uint2 screenSize;
+        }mParameters;
+
+        // register interop texture/surface here
+        struct {
+            NRC::RadianceQuery* screenQuery;
+            cudaSurfaceObject_t screenResult;
+        }mFalcorResources;
     };
 }

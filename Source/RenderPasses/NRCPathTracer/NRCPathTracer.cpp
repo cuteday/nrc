@@ -27,6 +27,10 @@ namespace
         { kAlbedoOutput,    "gOutputAlbedo",              "Surface albedo (base color) or background color", true /* optional */    },
         { kTimeOutput,      "gOutputTime",                "Per-pixel execution time", true /* optional */, ResourceFormat::R32Uint  },
     };
+
+    const Falcor::ChannelList kInternalChannels = {
+
+    };
 };
 
 const char* NRCPathTracer::sDesc = "NRC path tracer";
@@ -74,18 +78,25 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pTrainingRadianceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: training query");
-    }
-    if (!mNRC.pTrainingRadianceRecord) {
         mNRC.pTrainingRadianceRecord = Buffer::createStructured(sizeof(NRC::RadianceRecord), mNRC.max_training_record_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pTrainingRadianceRecord->getStructSize() != sizeof(NRC::RadianceRecord))
             throw std::runtime_error("Structure buffer size mismatch: training record");
-    }
-    if (!mNRC.pInferenceRadiaceQuery) {
         mNRC.pInferenceRadiaceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.max_inference_query_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pInferenceRadiaceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: inference query");
+    }
+
+    if (!mNRC.pScreenQueryBias || mNRC.pScreenQueryBias->getWidth() != targetDim.x || mNRC.pScreenQueryBias->getHeight() != targetDim.y) {
+        mNRC.pScreenQueryBias = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+        mNRC.pScreenQueryFactor = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+        mNRC.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+        // also register these resource to NRCInterface again
+
     }
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceRecord, 0);
@@ -141,7 +152,11 @@ void NRCPathTracer::setScene(RenderContext* pRenderContext, const Scene::SharedP
 void NRCPathTracer::renderUI(Gui::Widgets& widget)
 {
     PathTracer::renderUI(widget);
-    widget.checkbox("Enable NRC", mNRC.enableNRC);
+    if (widget.checkbox("Enable NRC", mNRC.enableNRC)) {
+        if (mNRC.enableNRC)
+            mTracer.pProgram->addDefine("NRC_ENABLE");
+        else mTracer.pProgram->removeDefine("NRC_ENABLE");
+    }
     if(mNRC.enableNRC){
         if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
             ||widget.var("Max training suffix bounces", mNRC.max_training_bounces, 3, 15, 1)     
@@ -234,6 +249,12 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
     endFrame(pRenderContext, renderData);
 }
 
+RenderPassReflection NRCPathTracer::reflect(const CompileData& compileData)
+{
+    RenderPassReflection reflector = PathTracer::reflect(compileData);
+    return reflector;
+}
+
 void NRCPathTracer::prepareVars()
 {
     assert(mTracer.pProgram);
@@ -296,4 +317,5 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = mNRC.trainingPathStrideRR;
     pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;
     pVars["NRCDataCB"]["gTerminateFootprintThres"] = mNRC.terminate_footprint_thres;
+
 }
