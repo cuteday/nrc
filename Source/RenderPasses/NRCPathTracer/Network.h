@@ -7,8 +7,11 @@
 #include <memory>
 #include <fstream>
 
-
-
+#ifdef __NVCC__
+#define NRC_CALLABLE __host__ __device__
+#else
+#define NRC_CALLABLE
+#endif
 
 namespace NRC {
     struct RadianceQuery
@@ -39,8 +42,7 @@ namespace NRC {
 
         NRCNetwork();
 
-    private:
         void initializeNetwork();
-        void inference(RadianceQuery* queries, uint32_t n_elements);
+        __host__ void inference(RadianceQuery* queries, int n_elements);
     };
 }

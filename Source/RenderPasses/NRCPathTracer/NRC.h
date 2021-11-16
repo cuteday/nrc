@@ -6,6 +6,7 @@
 #include "Network.h"
 #include "FalcorCUDA.h"
 
+
 using Falcor::uint;
 using Falcor::uint2;
 using Falcor::uint3;
@@ -31,6 +32,7 @@ namespace NRC {
 
         void registerNRCResources(Falcor::Buffer::SharedPtr pScreenQueryBuffer,
             Falcor::Texture::SharedPtr pScreenResultTexture) {
+            mParameters.screenSize = uint2(pScreenResultTexture->getWidth(), pScreenResultTexture->getHeight());
             mFalcorResources.screenQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pScreenQueryBuffer);
             mFalcorResources.screenResult = FalcorCUDA::mapTextureToSurfaceObject(pScreenResultTexture, cudaArrayColorAttachment);
         }      

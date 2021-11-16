@@ -73,7 +73,7 @@ namespace FalcorCUDA
     cudaExternalMemory_t importExternalMemory(Falcor::Resource::SharedPtr pResource) {
         HANDLE sharedHandle = pResource->getSharedApiHandle();
         if (sharedHandle == NULL) {
-            logFatal("CUDA::importing resource failed");
+            logFatal("FalcorCUDA::importing resource failed while creating shared handle.");
         }
 
         cudaExternalMemoryHandleDesc externalMemoryHandleDesc = {};
@@ -91,7 +91,6 @@ namespace FalcorCUDA
     void* mapExternalMemory(const cudaExternalMemory_t& externalMemory, unsigned long long size) {
         void* ptr = nullptr;
         cudaExternalMemoryBufferDesc desc = {};
-        
 
         desc.offset = 0;
         desc.size = size;
@@ -108,7 +107,21 @@ namespace FalcorCUDA
 
     cudaMipmappedArray_t importTextureToMipmappedArray(Falcor::Texture::SharedPtr pTexture, uint32_t cudaUsageFlags)
     {
-        cudaExternalMemory_t externalMemory = importExternalMemory(pTexture);
+        //cudaExternalMemory_t externalMemory = importExternalMemory(pTexture);
+
+        HANDLE sharedHandle = pTexture->getSharedApiHandle();
+        
+        cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
+        memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
+
+        // that's the D3D 12 commited resource
+        externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+        externalMemoryHandleDesc.handle.win32.handle = sharedHandle;
+        externalMemoryHandleDesc.size = pTexture->getTextureSizeInBytes();
+        externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+
+        cudaExternalMemory_t externalMemory;
+        CUDA_CHECK_SUCCESS(cudaImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
 
         cudaExternalMemoryMipmappedArrayDesc mipDesc = {};
         cudaMipmappedArray_t mipmappedArray;
@@ -123,6 +136,7 @@ namespace FalcorCUDA
         mipDesc.extent.height = pTexture->getHeight();
         mipDesc.flags = cudaUsageFlags;
         mipDesc.numLevels = 1;
+
         CUDA_CHECK_SUCCESS(cudaExternalMemoryGetMappedMipmappedArray(&mipmappedArray, externalMemory, &mipDesc));
         return mipmappedArray;
     }

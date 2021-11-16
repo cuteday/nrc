@@ -90,12 +90,13 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
 
     if (!mNRC.pScreenQueryBias || mNRC.pScreenQueryBias->getWidth() != targetDim.x || mNRC.pScreenQueryBias->getHeight() != targetDim.y) {
         mNRC.pScreenQueryBias = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mNRC.pScreenQueryFactor = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mNRC.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         // also register these resource to NRCInterface again
+        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadiaceQuery, mNRC.pScreenResult);
 
     }
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
@@ -240,9 +241,11 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
         // Train and inference the network
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
+            mNRC.pNRC->inferenceFrame();
         }
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
+            // no, we make training process an ansynchronous step.
         }
     }
     // Call shared post-render code.
