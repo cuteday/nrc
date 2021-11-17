@@ -34,6 +34,8 @@ public:
 private:
     NRCPathTracer(const Dictionary& dict);
 
+    //~NRCPathTracer();
+
     // these 2 functions are called within execute()
     bool beginFrame(RenderContext* pRenderContext, const RenderData& renderData);
     void endFrame(RenderContext* pRenderContext, const RenderData& renderData);

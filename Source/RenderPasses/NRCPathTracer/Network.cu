@@ -29,7 +29,7 @@ namespace {
     cudaStream_t inference_stream;
     cudaStream_t training_stream;
 
-    struct {
+    typedef struct {
         //using precision_t = network_precision_t;
         std::shared_ptr<Loss<precision_t>> loss = nullptr;
         std::shared_ptr<Optimizer<precision_t>> optimizer = nullptr;
@@ -38,9 +38,9 @@ namespace {
         //std::shared_ptr<Network<precision_t>> network = nullptr;
         //std::shared_ptr<Encoding<precision_t>> encoding = nullptr;
 
-    }mNetwork;
+    }_Network;
 
-    struct {
+    typedef struct {
         // the GPUMatrix class supports MxN matrices only
         // the GPUMatrix store in a continuous area in memory, either row major or column major
         GPUMatrix<float>* train_data = nullptr;
@@ -48,7 +48,10 @@ namespace {
         GPUMatrix<float>* pred_target = nullptr;
         GPUMatrix<float>* inference_data = nullptr;
         GPUMatrix<float>* inference_target = nullptr;
-    }mMemory;
+    }_Memory;
+
+    _Memory* mMemory;
+    _Network* mNetwork;
 }
 
 // kernels
@@ -75,8 +78,17 @@ namespace NRC {
         initializeNetwork();
     }
 
+    NRCNetwork::~NRCNetwork()
+    {
+        delete mNetwork;
+        delete mMemory;
+    }
+
     void NRCNetwork::initializeNetwork()
     {
+        mNetwork = new _Network();
+        mMemory = new _Memory();
+
         //initialize network
         //using precision_t = network_precision_t;
 
@@ -89,17 +101,17 @@ namespace NRC {
         json network_opts = config.value("network", json::object());
         json encoding_opts = config.value("encoding", json::object());
 
-        mNetwork.loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
-        mNetwork.optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-        //mNetwork.network = std::shared_ptr<Network<precision_t>>(create_network<precision_t>(network_opts));
-        mNetwork.network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, 0, output_dim, encoding_opts, network_opts);
-        mNetwork.trainer = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork.network, mNetwork.optimizer, mNetwork.loss);
+        mNetwork->loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
+        mNetwork->optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
+        //mNetwork->network = std::shared_ptr<Network<precision_t>>(create_network<precision_t>(network_opts));
+        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, 0, output_dim, encoding_opts, network_opts);
+        mNetwork->trainer = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork->network, mNetwork->optimizer, mNetwork->loss);
 
-        mMemory.train_data = new GPUMatrix<float>(input_dim, batch_size);
-        mMemory.train_target = new GPUMatrix<float>(output_dim, batch_size);
-        mMemory.pred_target = new GPUMatrix<float>(output_dim, batch_size);
-        mMemory.inference_data = new GPUMatrix<float>(input_dim, padded_resolution);
-        mMemory.inference_target = new GPUMatrix<float>(output_dim, padded_resolution);
+        mMemory->train_data = new GPUMatrix<float>(input_dim, batch_size);
+        mMemory->train_target = new GPUMatrix<float>(output_dim, batch_size);
+        mMemory->pred_target = new GPUMatrix<float>(output_dim, batch_size);
+        mMemory->inference_data = new GPUMatrix<float>(input_dim, padded_resolution);
+        mMemory->inference_target = new GPUMatrix<float>(output_dim, padded_resolution);
     }
 
     void NRCNetwork::inference(RadianceQuery* queries, int n_elements)
@@ -108,20 +120,21 @@ namespace NRC {
         int n_queries = next_multiple(n_elements, 256);
         //for (int i = 0; i < 1; i++) {
         //    linear_kernel(generateBatchSequential<output_dim>, 0, inference_stream, batch_size,
-        //        i * batch_size, queries, mMemory.train_data->data());
-        //    mNetwork.network->inference(inference_stream, *mMemory.train_data, *mMemory.train_target);
+        //        i * batch_size, queries, mMemory->train_data->data());
+        //    mNetwork->network->inference(inference_stream, *mMemory->train_data, *mMemory->train_target);
         //}
-        // this costs about < 1ms
+        
+        // this input generation process takes about ~1ms.
         linear_kernel(generateBatchSequential<output_dim>, 0, inference_stream, n_elements,
-            0, queries, mMemory.inference_data->data());
-        cudaStreamSynchronize(inference_stream);
-        mNetwork.network->inference(inference_stream, *mMemory.inference_data, *mMemory.inference_target);
+            0, queries, mMemory->inference_data->data());
+        
+        mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
         cudaStreamSynchronize(inference_stream);
     }
 
     void NRCNetwork::train(float& loss)
     {
-        mNetwork.trainer->training_step(training_stream, *mMemory.train_data, *mMemory.train_target, &loss);
+        mNetwork->trainer->training_step(training_stream, *mMemory->train_data, *mMemory->train_target, &loss);
         cudaStreamSynchronize(training_stream);
     }
 }

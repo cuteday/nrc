@@ -58,6 +58,8 @@ NRCPathTracer::NRCPathTracer(const Dictionary& dict)
     assert(mTracer.pNRCPixelStats);
 }
 
+
+
 /* under testing process */
 bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& renderData)
 {

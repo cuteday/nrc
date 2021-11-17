@@ -16,7 +16,7 @@
 		"n_frequencies": 12		
 	},
 	"network": {
-		"otype": "MLP",
+		"otype": "FullyFusedMLP",
 		"activation": "ReLU",
 		"output_activation": "None",
 		"n_neurons": 64,

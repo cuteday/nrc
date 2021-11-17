@@ -41,6 +41,7 @@ namespace NRC {
         using SharedConstPtr = std::shared_ptr<const NRCNetwork>;
 
         NRCNetwork();
+        ~NRCNetwork();
 
         void initializeNetwork();
         __host__ void inference(RadianceQuery* queries, int n_elements);
