@@ -104,13 +104,16 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>cuda.lib;cublas.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>curand.lib;cuda.lib;cublas.lib;cusolver.lib;cudadevrt.lib;$(SolutionDir)Source\tiny-cuda-nn\build\src\Debug\tiny-cuda-nn.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CodeGeneration>compute_86,sm_86</CodeGeneration>
       <AdditionalOptions>--extended-lambda %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
+    <CudaLink>
+      <AdditionalOptions>-forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets %(AdditionalOptions)</AdditionalOptions>
+    </CudaLink>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -132,7 +135,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>cuda.lib;cublas.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>curand.lib;cuda.lib;cublas.lib;cusolver.lib;cudadevrt.lib;$(SolutionDir)Source\tiny-cuda-nn\build\src\Debug\tiny-cuda-nn.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <Include>%(Include)</Include>
@@ -140,6 +143,9 @@
       <CodeGeneration>compute_86,sm_86</CodeGeneration>
       <AdditionalOptions>--extended-lambda %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
+    <CudaLink>
+      <AdditionalOptions>-forward-unknown-to-host-compiler -Wno-deprecated-gpu-targets %(AdditionalOptions)</AdditionalOptions>
+    </CudaLink>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

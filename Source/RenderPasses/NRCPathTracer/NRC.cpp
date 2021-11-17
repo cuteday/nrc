@@ -16,6 +16,8 @@ namespace NRC {
 
     void NRCInterface::trainFrame()
     {
+        float loss;
+        network->train(loss);
     }
 
     void NRCInterface::inferenceFrame()

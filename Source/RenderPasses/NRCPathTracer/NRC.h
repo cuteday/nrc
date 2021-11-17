@@ -6,7 +6,6 @@
 #include "Network.h"
 #include "FalcorCUDA.h"
 
-
 using Falcor::uint;
 using Falcor::uint2;
 using Falcor::uint3;

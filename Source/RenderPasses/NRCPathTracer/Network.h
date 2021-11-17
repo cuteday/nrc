@@ -44,5 +44,6 @@ namespace NRC {
 
         void initializeNetwork();
         __host__ void inference(RadianceQuery* queries, int n_elements);
+        __host__ void train(float& loss);
     };
 }

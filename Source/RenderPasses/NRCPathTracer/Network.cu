@@ -20,8 +20,8 @@ namespace {
     int resolution = 1920 * 1080;
     int padded_resolution = next_multiple(resolution, 256);
     int batch_size = 1 << 14;
-    const int input_dims = 5;         // pos, dir
-    const int output_dims = 3;        // RGB
+    const int input_dim = 5;         // pos, dir
+    const int output_dim = 3;        // RGB
     const int alignment = 16;         // input dim alignment
     std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc.json";
 
@@ -34,6 +34,7 @@ namespace {
         std::shared_ptr<Loss<precision_t>> loss = nullptr;
         std::shared_ptr<Optimizer<precision_t>> optimizer = nullptr;
         std::shared_ptr<NetworkWithInputEncoding<precision_t>> network = nullptr;
+        std::shared_ptr<Trainer<float, precision_t, precision_t>> trainer = nullptr;
         //std::shared_ptr<Network<precision_t>> network = nullptr;
         //std::shared_ptr<Encoding<precision_t>> encoding = nullptr;
 
@@ -91,30 +92,36 @@ namespace NRC {
         mNetwork.loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
         mNetwork.optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
         //mNetwork.network = std::shared_ptr<Network<precision_t>>(create_network<precision_t>(network_opts));
-        mNetwork.network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dims, 0, output_dims, encoding_opts, network_opts);
+        mNetwork.network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, 0, output_dim, encoding_opts, network_opts);
+        mNetwork.trainer = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork.network, mNetwork.optimizer, mNetwork.loss);
 
-        mMemory.train_data = new GPUMatrix<float>(input_dims, batch_size);
-        mMemory.train_target = new GPUMatrix<float>(output_dims, batch_size);
-        mMemory.pred_target = new GPUMatrix<float>(output_dims, batch_size);
-        mMemory.inference_data = new GPUMatrix<float>(input_dims, padded_resolution);
-        mMemory.inference_target = new GPUMatrix<float>(input_dims, padded_resolution);
+        mMemory.train_data = new GPUMatrix<float>(input_dim, batch_size);
+        mMemory.train_target = new GPUMatrix<float>(output_dim, batch_size);
+        mMemory.pred_target = new GPUMatrix<float>(output_dim, batch_size);
+        mMemory.inference_data = new GPUMatrix<float>(input_dim, padded_resolution);
+        mMemory.inference_target = new GPUMatrix<float>(output_dim, padded_resolution);
     }
 
     void NRCNetwork::inference(RadianceQuery* queries, int n_elements)
     {
         int n_batches = div_round_up(n_elements, batch_size);
         int n_queries = next_multiple(n_elements, 256);
-        for (int i = 0; i < 1; i++) {
-            linear_kernel(generateBatchSequential<output_dims>, 0, inference_stream, batch_size,
-                i * batch_size, queries, mMemory.train_data->data());
-            mNetwork.network->inference(inference_stream, *(mMemory.train_data), *(mMemory.pred_target));
-        }
+        //for (int i = 0; i < 1; i++) {
+        //    linear_kernel(generateBatchSequential<output_dim>, 0, inference_stream, batch_size,
+        //        i * batch_size, queries, mMemory.train_data->data());
+        //    mNetwork.network->inference(inference_stream, *mMemory.train_data, *mMemory.train_target);
+        //}
         // this costs about < 1ms
-        /*linear_kernel(generateBatchSequential<output_dims>, 0, inference_stream, n_queries,
+        linear_kernel(generateBatchSequential<output_dim>, 0, inference_stream, n_elements,
             0, queries, mMemory.inference_data->data());
-
-        mNetwork.network->inference(inference_stream, *(mMemory.inference_data), *(mMemory.inference_target));*/
-
         cudaStreamSynchronize(inference_stream);
+        mNetwork.network->inference(inference_stream, *mMemory.inference_data, *mMemory.inference_target);
+        cudaStreamSynchronize(inference_stream);
+    }
+
+    void NRCNetwork::train(float& loss)
+    {
+        mNetwork.trainer->training_step(training_stream, *mMemory.train_data, *mMemory.train_target, &loss);
+        cudaStreamSynchronize(training_stream);
     }
 }

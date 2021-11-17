@@ -238,14 +238,14 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             mTracer.pVars["NRCDataCB"]["gIsTrainingPass"] = true;
             mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim.x / 6, targetDim.y / 6, 1));
         }
-        // Train and inference the network
-        {
-            PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
-            mNRC.pNRC->inferenceFrame();
-        }
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
             // no, we make training process an ansynchronous step.
+            mNRC.pNRC->trainFrame();
+        }
+        {
+            PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
+            mNRC.pNRC->inferenceFrame();
         }
     }
     // Call shared post-render code.
