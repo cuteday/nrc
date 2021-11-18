@@ -238,7 +238,7 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
         {
             PROFILE("NRCPathTracer::execute()_RayTrace_TrainingSuffix");
             mTracer.pVars["NRCDataCB"]["gIsTrainingPass"] = true;
-            mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim.x / 6, targetDim.y / 6, 1));
+            mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim / mNRC.trainingPathStride, 1));
         }
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
@@ -248,6 +248,10 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
             mNRC.pNRC->inferenceFrame();
+        }
+        {
+            PROFILE("NRCPathTracer::execute()_Composite_Outputs");
+
         }
     }
     // Call shared post-render code.

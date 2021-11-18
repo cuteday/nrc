@@ -44,7 +44,7 @@ namespace NRC {
         ~NRCNetwork();
 
         void initializeNetwork();
-        __host__ void inference(RadianceQuery* queries, int n_elements);
+        __host__ void inference(RadianceQuery* queries, cudaSurfaceObject_t output, unsigned int width, unsigned int height);
         __host__ void train(float& loss);
     };
 }

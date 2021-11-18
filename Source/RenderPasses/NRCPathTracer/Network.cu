@@ -14,23 +14,20 @@ using precision_t = tcnn::network_precision_t;
 
 namespace {
 
-    //using network_precision_t = float;
-
     // 4 steps each frame, with 16384 samples per batch
-    int resolution = 1920 * 1080;
-    int padded_resolution = next_multiple(resolution, 256);
-    int batch_size = 1 << 14;
-    const int input_dim = 5;         // pos, dir
-    const int output_dim = 3;        // RGB
-    const int alignment = 16;         // input dim alignment
-    std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc.json";
+    unsigned int resolution = 1920 * 1080;
+    unsigned int padded_resolution = next_multiple(resolution, 256u);
+    const unsigned int batch_size = 1 << 14;
+    const unsigned int input_dim = 5;         // pos, dir
+    const unsigned int output_dim = 3;        // RGB
+    const unsigned int alignment = 16;        // input dim alignment
+    const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc.json";
 
     // cuda related
     cudaStream_t inference_stream;
     cudaStream_t training_stream;
 
-    typedef struct {
-        //using precision_t = network_precision_t;
+    struct _Network { 
         std::shared_ptr<Loss<precision_t>> loss = nullptr;
         std::shared_ptr<Optimizer<precision_t>> optimizer = nullptr;
         std::shared_ptr<NetworkWithInputEncoding<precision_t>> network = nullptr;
@@ -38,9 +35,9 @@ namespace {
         //std::shared_ptr<Network<precision_t>> network = nullptr;
         //std::shared_ptr<Encoding<precision_t>> encoding = nullptr;
 
-    }_Network;
+    };
 
-    typedef struct {
+    struct _Memory {
         // the GPUMatrix class supports MxN matrices only
         // the GPUMatrix store in a continuous area in memory, either row major or column major
         GPUMatrix<float>* train_data = nullptr;
@@ -48,14 +45,14 @@ namespace {
         GPUMatrix<float>* pred_target = nullptr;
         GPUMatrix<float>* inference_data = nullptr;
         GPUMatrix<float>* inference_target = nullptr;
-    }_Memory;
+    };
 
     _Memory* mMemory;
     _Network* mNetwork;
 }
 
-// kernels
-template <uint32_t stride, typename T = float>
+// linear kernels with only x-dim not 1. must be called using linear_kernal()
+template <uint32_t stride = 5, typename T = float>
 __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset, 
     NRC::RadianceQuery* __restrict__ queries, T* __restrict__ data) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -67,6 +64,20 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
     data[index + 2] = (T)queries[i].pos.z;
     data[index + 3] = (T)queries[i].dir.x;
     data[index + 4] = (T)queries[i].dir.y;
+}
+
+template <typename T = float>
+__global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
+    T* __restrict__ data, cudaSurfaceObject_t output) {
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int x = i % width, y = i / width;
+    unsigned int index = i * 3;
+    float4 radiance;
+    radiance.x = data[index + 0];
+    radiance.x = data[index + 1];
+    radiance.x = data[index + 2];
+    radiance.w = 0.0f;
+    surf2Dwrite(radiance, output, sizeof(float4) * x, y);
 }
 
 namespace NRC {
@@ -114,21 +125,20 @@ namespace NRC {
         mMemory->inference_target = new GPUMatrix<float>(output_dim, padded_resolution);
     }
 
-    void NRCNetwork::inference(RadianceQuery* queries, int n_elements)
+    void NRCNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,
+        unsigned int width, unsigned int height)
     {
+        unsigned int n_elements = width * height;
         int n_batches = div_round_up(n_elements, batch_size);
-        int n_queries = next_multiple(n_elements, 256);
-        //for (int i = 0; i < 1; i++) {
-        //    linear_kernel(generateBatchSequential<output_dim>, 0, inference_stream, batch_size,
-        //        i * batch_size, queries, mMemory->train_data->data());
-        //    mNetwork->network->inference(inference_stream, *mMemory->train_data, *mMemory->train_target);
-        //}
+        int n_queries = next_multiple(n_elements, 256u);
         
         // this input generation process takes about ~1ms.
         linear_kernel(generateBatchSequential<output_dim>, 0, inference_stream, n_elements,
             0, queries, mMemory->inference_data->data());
         
         mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
+
+        linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
         cudaStreamSynchronize(inference_stream);
     }
 
