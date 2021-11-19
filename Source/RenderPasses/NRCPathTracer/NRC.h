@@ -30,11 +30,14 @@ namespace NRC {
         void inferenceFrame();
 
         void registerNRCResources(Falcor::Buffer::SharedPtr pScreenQueryBuffer,
-            Falcor::Texture::SharedPtr pScreenResultTexture) {
+            Falcor::Texture::SharedPtr pScreenResultTexture,
+            Falcor::Buffer::SharedPtr pTrainingQueryBuffer,
+            Falcor::Buffer::SharedPtr pTrainingSampleBuffer) {
             mParameters.screenSize = uint2(pScreenResultTexture->getWidth(), pScreenResultTexture->getHeight());
             mFalcorResources.screenQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pScreenQueryBuffer);
             mFalcorResources.screenResult = FalcorCUDA::mapTextureToSurfaceObject(pScreenResultTexture, cudaArrayColorAttachment);
-            
+            mFalcorResources.trainingQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pTrainingQueryBuffer);
+            mFalcorResources.trainingSample = (NRC::RadianceSample*)FalcorCUDA::importResourceToDevicePointer(pTrainingSampleBuffer);
         }      
 
     private:
@@ -46,8 +49,10 @@ namespace NRC {
 
         // register interop texture/surface here
         struct {
-            NRC::RadianceQuery* screenQuery;
-            cudaSurfaceObject_t screenResult;
+            NRC::RadianceQuery* screenQuery;           
+            cudaSurfaceObject_t screenResult;       // write inferenced results here
+            NRC::RadianceQuery* trainingQuery;
+            NRC::RadianceSample* trainingSample;
         }mFalcorResources;
     };
 }

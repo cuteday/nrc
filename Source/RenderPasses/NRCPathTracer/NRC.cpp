@@ -1,4 +1,5 @@
 #include "NRC.h"
+#include "Parameters.h"
 
 using namespace Falcor;
 
@@ -17,7 +18,8 @@ namespace NRC {
     void NRCInterface::trainFrame()
     {
         float loss;
-        network->train(loss);
+        network->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
+            mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);
     }
 
     void NRCInterface::inferenceFrame()
@@ -26,5 +28,4 @@ namespace NRC {
         network->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
             mParameters.screenSize.x, mParameters.screenSize.y);
     }
-
 }

@@ -34,6 +34,7 @@
     <ClInclude Include="Network.h" />
     <ClInclude Include="NRC.h" />
     <ClInclude Include="NRCPathTracer.h" />
+    <ClInclude Include="Parameters.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Falcor\Falcor.vcxproj">
@@ -44,6 +45,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ShaderSource Include="Composite.slang" />
     <ShaderSource Include="Debug\NRCPixelStats.slang" />
     <ShaderSource Include="Debug\NRCPixelStatsShared.slang" />
     <ShaderSource Include="NRC.slang" />

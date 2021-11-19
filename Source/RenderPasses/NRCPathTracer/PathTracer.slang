@@ -518,7 +518,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         // however, when [missed] the length-th record could actually be used.
         float3 sampleL = (path.L - pathRecords[i].L) / pathRecords[i].thp;
         float3 sampleFactor = path.thp / pathRecords[i].thp;
-        addTrainingSample(sampleFactor, sampleL, queryIndex);   
+        addTrainingSample(sampleFactor, sampleL, pathRecords[i].query, queryIndex);   
     }
 
     return queryRadiance;

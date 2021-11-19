@@ -26,6 +26,9 @@
     <ClInclude Include="Debug\NRCPixelStats.h">
       <Filter>Debug</Filter>
     </ClInclude>
+    <ClInclude Include="Parameters.h">
+      <Filter>NN</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ShaderSource Include="PathTracer.rt.slang" />
@@ -37,6 +40,7 @@
     <ShaderSource Include="Debug\NRCPixelStatsShared.slang">
       <Filter>Debug</Filter>
     </ShaderSource>
+    <ShaderSource Include="Composite.slang" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="NN">

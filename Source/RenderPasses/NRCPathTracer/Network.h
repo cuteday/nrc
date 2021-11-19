@@ -6,7 +6,6 @@
 #include <string>
 #include <memory>
 #include <fstream>
-
 #ifdef __NVCC__
 #define NRC_CALLABLE __host__ __device__
 #else
@@ -20,13 +19,9 @@ namespace NRC {
         float2 dir;
     };
 
-    struct RadianceRecord
-    {
-        float3 radiance;
-    };
-
     struct RadianceSample
     {
+        RadianceQuery query;
         // L_o (scattered radiance) = a * L_i + b
         float3 a;   // factor of scatter ray (bsdf sample)
         float3 b;   // the direct sample part
@@ -45,6 +40,7 @@ namespace NRC {
 
         void initializeNetwork();
         __host__ void inference(RadianceQuery* queries, cudaSurfaceObject_t output, unsigned int width, unsigned int height);
-        __host__ void train(float& loss);
+        __host__ void train(RadianceQuery* self_queries, unsigned int n_self_query,
+            RadianceSample* training_samples, unsigned int n_training_sample, float& loss);
     };
 }

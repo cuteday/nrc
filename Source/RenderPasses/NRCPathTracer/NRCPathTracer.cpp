@@ -2,6 +2,7 @@
 #include "RenderGraph/RenderPassHelpers.h"
 #include "Scene/HitInfo.h"
 #include <sstream>
+#include "Parameters.h"
 
 namespace
 {
@@ -33,6 +34,7 @@ namespace
     };
 };
 
+using namespace NRC;
 const char* NRCPathTracer::sDesc = "NRC path tracer";
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -64,7 +66,7 @@ NRCPathTracer::NRCPathTracer(const Dictionary& dict)
 bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& renderData)
 {
     uint2 targetDim = renderData.getDefaultTextureDims();
-    if (targetDim.x * targetDim.y > mNRC.max_inference_query_size) {
+    if (targetDim.x * targetDim.y > Parameters::max_inference_query_size) {
         logFatal("Screen size exceeds maximum inference restriction");
     }
     bool state = PathTracer::beginFrame(pRenderContext, renderData);
@@ -76,15 +78,15 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
         /* there are 3 ways to create a structured buffer shader resource */
         //mNRC.pSample = Buffer::createStructured(mTracer.pProgram.get(), "gSample", 2000);
         //mNRC.pSample = Buffer::createStructured(mTracer.pVars.getRootVar()["gSample"], 2000);
-        mNRC.pTrainingRadianceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.max_training_query_size,
+        mNRC.pTrainingRadianceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), Parameters::max_training_query_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        if (mNRC.pTrainingRadianceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
+        if (mNRC.pTrainingRadianceQuery->getStructSize() != sizeof(NRC::RadianceQuery)) // check struct size to avoid alignment problems (?)
             throw std::runtime_error("Structure buffer size mismatch: training query");
-        mNRC.pTrainingRadianceRecord = Buffer::createStructured(sizeof(NRC::RadianceRecord), mNRC.max_training_record_size,
+        mNRC.pTrainingRadianceSample = Buffer::createStructured(sizeof(NRC::RadianceSample), Parameters::max_training_sample_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        if (mNRC.pTrainingRadianceRecord->getStructSize() != sizeof(NRC::RadianceRecord))
+        if (mNRC.pTrainingRadianceSample->getStructSize() != sizeof(NRC::RadianceSample))
             throw std::runtime_error("Structure buffer size mismatch: training record");
-        mNRC.pInferenceRadiaceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), mNRC.max_inference_query_size,
+        mNRC.pInferenceRadiaceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), Parameters::max_inference_query_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pInferenceRadiaceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: inference query");
@@ -92,17 +94,17 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
 
     if (!mNRC.pScreenQueryBias || mNRC.pScreenQueryBias->getWidth() != targetDim.x || mNRC.pScreenQueryBias->getHeight() != targetDim.y) {
         mNRC.pScreenQueryBias = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mNRC.pScreenQueryFactor = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mNRC.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         // also register these resource to NRCInterface again
-        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadiaceQuery, mNRC.pScreenResult);
+        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadiaceQuery, mNRC.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample);
 
     }
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
-    pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceRecord, 0);
+    pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceSample, 0);
     mTracer.pNRCPixelStats->beginFrame(pRenderContext, renderData.getDefaultTextureDims());
     return state;
 }
@@ -238,7 +240,7 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
         {
             PROFILE("NRCPathTracer::execute()_RayTrace_TrainingSuffix");
             mTracer.pVars["NRCDataCB"]["gIsTrainingPass"] = true;
-            mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim / mNRC.trainingPathStride, 1));
+            mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim / Parameters::trainingPathStride, 1));
         }
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
@@ -320,10 +322,10 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gNRCEnable"] = mNRC.enableNRC;
     pVars["NRCDataCB"]["gIsTrainingPass"] = false;      // reset this flag for next frame
     pVars["NRCDataCB"]["gNRCScreenSize"] = renderData.getDefaultTextureDims();
-    pVars["NRCDataCB"]["gNRCTrainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.x,
-        std::rand() / (float)RAND_MAX * mNRC.trainingPathStride.y);
-    pVars["NRCDataCB"]["gNRCTrainingPathStride"] = mNRC.trainingPathStride;
-    pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = mNRC.trainingPathStrideRR;
+    pVars["NRCDataCB"]["gNRCTrainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * Parameters::trainingPathStride.x,
+        std::rand() / (float)RAND_MAX * Parameters::trainingPathStride.y);
+    pVars["NRCDataCB"]["gNRCTrainingPathStride"] = Parameters::trainingPathStride;
+    pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = Parameters::trainingPathStrideRR;
     pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;
     pVars["NRCDataCB"]["gTerminateFootprintThres"] = mNRC.terminate_footprint_thres;
 

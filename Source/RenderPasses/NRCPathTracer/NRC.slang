@@ -59,13 +59,9 @@ struct RadianceQuery
     float2 dir;
 };
 
-struct RadianceRecord
-{
-    float3 radiance;
-};
-
 struct RadianceSample
 {
+    RadianceQuery query;
     // L_o (scattered radiance) = a * L_i + b
     float3 a;   // factor of scatter ray (bsdf sample)
     float3 b;   // the direct sample part
@@ -82,7 +78,7 @@ struct PathVertexRecord
 // radiance training sample at maximum
 // for RR training data, no radiance info is needed
 RWStructuredBuffer<RadianceQuery> gTrainingRadianceQuery;
-RWStructuredBuffer<RadianceSample> gTrainingRadianceRecord;
+RWStructuredBuffer<RadianceSample> gTrainingRadianceSample;
 // for self training data, additional radiance info is needed
 
 // radiance query at screen resolution
@@ -158,10 +154,10 @@ int addTrainingQuery(float3 pos, float3 dir)
     return idx;
 }
 
-void addTrainingSample(float3 a, float3 b, int queryIndex)
+void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
 {
-    int idx = gTrainingRadianceRecord.IncrementCounter();
-    RadianceSample record = { a, b, queryIndex};
-    gTrainingRadianceRecord[idx] = record;
+    int idx = gTrainingRadianceSample.IncrementCounter();
+    RadianceSample record = { query, a, b, queryIndex };
+    gTrainingRadianceSample[idx] = record;
 }
 
