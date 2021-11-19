@@ -40,7 +40,7 @@ namespace NRC {
 
         void initializeNetwork();
         __host__ void inference(RadianceQuery* queries, cudaSurfaceObject_t output, unsigned int width, unsigned int height);
-        __host__ void train(RadianceQuery* self_queries, unsigned int n_self_query,
-            RadianceSample* training_samples, unsigned int n_training_sample, float& loss);
+        __host__ void train(RadianceQuery* self_queries, uint32_t* self_query_counter,
+            RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss);
     };
 }

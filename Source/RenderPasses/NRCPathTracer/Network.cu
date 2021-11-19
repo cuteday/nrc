@@ -82,26 +82,54 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
 }
 
 // TODO: generate batched random shuffled training data (using a linear congruential generator?
+// TODO: detect samples that are not initialized (e.g. through the UAV counter mapped to cuda device pointer?)
+//template <typename T = float>
+//__global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
+//    NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
+//    T* __restrict__ training_data, T* __restrict__ training_target) {
+//    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+//    if (i + offset > n_elements) return;
+//    uint32_t data_index = i * 5, sample_index = i + offset;
+//    
+//    training_data[data_index + 0] = (T)samples[sample_index].query.pos.x;
+//    training_data[data_index + 1] = (T)samples[sample_index].query.pos.y;
+//    training_data[data_index + 2] = (T)samples[sample_index].query.pos.z;
+//    training_data[data_index + 3] = (T)samples[sample_index].query.dir.x;
+//    training_data[data_index + 4] = (T)samples[sample_index].query.dir.y;
+//
+//    float3 factor = samples[sample_index].a, bias = samples[sample_index].b;
+//    uint32_t output_index = i * 3;
+//    uint32_t pred_index = samples[sample_index].idx >= 0 ? samples[sample_index].idx : 0;
+//    float3 pred_radiance = { self_query_pred[pred_index], self_query_pred[pred_index + 1], self_query_pred[pred_index + 2] };
+//    float3 radiance = vec3_add(vec3_mult(pred_radiance, factor), bias);
+//    training_target[output_index + 0] = (T)radiance.x ;
+//    training_target[output_index + 1] = (T)radiance.y;
+//    training_target[output_index + 2] = (T)radiance.z;
+//}
+
 template <typename T = float>
 __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
     NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
-    T* __restrict__ training_data, T* __restrict__ training_target) {
+    T* __restrict__ training_data, T* __restrict__ training_target,
+    uint32_t* training_sample_counter, uint32_t* self_query_counter) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
     uint32_t data_index = i * 5, sample_index = i + offset;
-    
+    if (sample_index > *training_sample_counter) return;
+    uint32_t pred_index = samples[sample_index].idx >= 0 ? samples[sample_index].idx : 0;
+    if (pred_index > *self_query_counter) return;
+    float3 factor = samples[sample_index].a, bias = samples[sample_index].b;
+    uint32_t output_index = i * 3;
+
     training_data[data_index + 0] = (T)samples[sample_index].query.pos.x;
     training_data[data_index + 1] = (T)samples[sample_index].query.pos.y;
     training_data[data_index + 2] = (T)samples[sample_index].query.pos.z;
     training_data[data_index + 3] = (T)samples[sample_index].query.dir.x;
     training_data[data_index + 4] = (T)samples[sample_index].query.dir.y;
 
-    float3 factor = samples[sample_index].a, bias = samples[sample_index].b;
-    uint32_t output_index = i * 3;
-    uint32_t pred_index = samples[sample_index].idx >= 0 ? samples[sample_index].idx * 1 : 0;
     float3 pred_radiance = { self_query_pred[pred_index], self_query_pred[pred_index + 1], self_query_pred[pred_index + 2] };
     float3 radiance = vec3_add(vec3_mult(pred_radiance, factor), bias);
-    training_target[output_index + 0] = (T)radiance.x ;
+    training_target[output_index + 0] = (T)radiance.x;
     training_target[output_index + 1] = (T)radiance.y;
     training_target[output_index + 2] = (T)radiance.z;
 }
@@ -141,9 +169,6 @@ namespace NRC {
         mMemory = new _Memory();
 
         //initialize network
-        //using precision_t = network_precision_t;
-
-        //logInfo("Loading custom network config at" + mNetworkParams.config_path);
         std::ifstream f(config_path);
         tcnn::json config = tcnn::json::parse(f, nullptr, true, true);
 
@@ -184,8 +209,8 @@ namespace NRC {
         cudaStreamSynchronize(inference_stream);
     }
 
-    void NRCNetwork::train(RadianceQuery* self_queries, unsigned int n_self_query,
-        RadianceSample* training_samples, unsigned int n_training_sample, float& loss)
+    void NRCNetwork::train(RadianceQuery* self_queries, uint32_t* self_query_counter,
+        RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss)
     {
         // self query
         linear_kernel(generateBatchSequential<output_dim>, 0, training_stream, self_query_batch_size,
@@ -194,7 +219,8 @@ namespace NRC {
         // training
         linear_kernel(generateTrainingDataFromSamples<float>, 0, training_stream, batch_size,
             0, training_samples, mMemory->training_self_pred->data(),
-            mMemory->training_data->data(), mMemory->training_target->data());
+            mMemory->training_data->data(), mMemory->training_target->data(),
+            training_sample_counter, self_query_counter);
         mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
         cudaStreamSynchronize(training_stream);
     }

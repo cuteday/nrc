@@ -68,15 +68,17 @@ private:
         //uint max_training_query_size = 1 << 16;     // ~57,600
         //uint max_training_record_size = 1920 * 1080 / 36 * 10;
         int max_training_bounces = 5;               // max path segments for training suffix
-        int max_training_rr_bounces = 10;           
+        int max_training_rr_bounces = 10;
         int max_inference_bounces = 5;
 
         Buffer::SharedPtr pTrainingRadianceQuery = nullptr;
         Buffer::SharedPtr pTrainingRadianceSample = nullptr;
         Buffer::SharedPtr pInferenceRadiaceQuery = nullptr;
+        Buffer::SharedPtr pSharedCounterBuffer = nullptr;
         Texture::SharedPtr pScreenQueryFactor = nullptr;
         Texture::SharedPtr pScreenQueryBias = nullptr;
         Texture::SharedPtr pScreenResult = nullptr;
+
     } mNRC;
 
     ComputePass::SharedPtr mCompositePass;

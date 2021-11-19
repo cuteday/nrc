@@ -18,8 +18,10 @@ namespace NRC {
     void NRCInterface::trainFrame()
     {
         float loss;
-        network->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
-            mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);
+        /*network->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
+            mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);*/
+        network->train(mFalcorResources.trainingQuery, mFalcorResources.trainingQueryCounter,
+            mFalcorResources.trainingSample, mFalcorResources.trainingSampleCounter, loss);
     }
 
     void NRCInterface::inferenceFrame()

@@ -59,8 +59,6 @@ NRCPathTracer::NRCPathTracer(const Dictionary& dict)
     assert(mTracer.pNRCPixelStats);
 }
 
-
-
 /* under testing process */
 bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& renderData)
 {
@@ -89,6 +87,8 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pInferenceRadiaceQuery->getStructSize() != sizeof(NRC::RadianceQuery))
             throw std::runtime_error("Structure buffer size mismatch: inference query");
+        mNRC.pSharedCounterBuffer = Buffer::createStructured(sizeof(uint32_t), 8,
+            Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
     }
 
     if (!mNRC.pScreenQueryBias || mNRC.pScreenQueryBias->getWidth() != targetDim.x || mNRC.pScreenQueryBias->getHeight() != targetDim.y) {
@@ -99,7 +99,8 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
         mNRC.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         // also register these resource to NRCInterface again
-        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadiaceQuery, mNRC.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample);
+        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadiaceQuery, mNRC.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
+            mNRC.pSharedCounterBuffer);
 
     }
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
@@ -242,6 +243,12 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             PROFILE("NRCPathTracer::execute()_RayTrace_TrainingSuffix");
             mTracer.pVars["NRCDataCB"]["gIsTrainingPass"] = true;
             mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim / Parameters::trainingPathStride, 1));
+        }
+        {
+            // this takes <0.05ms
+            PROFILE("NRCPathTracer::execute()_CounterBuffer");
+            pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 0, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
+            pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
         }
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
