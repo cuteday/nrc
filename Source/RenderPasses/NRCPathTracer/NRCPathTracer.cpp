@@ -7,6 +7,7 @@
 namespace
 {
     const char kShaderFile[] = "RenderPasses/NRCPathTracer/PathTracer.rt.slang";
+    const char kCompositeShaderFile[] = "RenderPasses/NRCPathTracer/Composite.cs.slang";
     const char kParameterBlockName[] = "gData";
 
     // Ray tracing settings that affect the traversal stack size.
@@ -21,16 +22,14 @@ namespace
     const std::string kColorOutput = "color";
     const std::string kAlbedoOutput = "albedo";
     const std::string kTimeOutput = "time";
+    const std::string kNRCResultOutput = "result";
 
     const Falcor::ChannelList kOutputChannels =
     {
         { kColorOutput,     "gOutputColor",               "Output color (linear)", true /* optional */                              },
         { kAlbedoOutput,    "gOutputAlbedo",              "Surface albedo (base color) or background color", true /* optional */    },
         { kTimeOutput,      "gOutputTime",                "Per-pixel execution time", true /* optional */, ResourceFormat::R32Uint  },
-    };
-
-    const Falcor::ChannelList kInternalChannels = {
-
+        { kNRCResultOutput, "gOutputResult",              "NRC predicted radiance composited", true }
     };
 };
 
@@ -151,6 +150,8 @@ void NRCPathTracer::setScene(RenderContext* pRenderContext, const Scene::SharedP
         sbt->setHitGroupByType(kRayTypeShadow, mpScene, Scene::GeometryType::TriangleMesh, desc.addHitGroup("", "shadowAnyHit"));
 
         mTracer.pProgram = RtProgram::create(desc);
+
+        mCompositePass = ComputePass::create(kCompositeShaderFile, "main");
     }
 }
 
@@ -253,7 +254,7 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
         }
         {
             PROFILE("NRCPathTracer::execute()_Composite_Outputs");
-
+            mCompositePass->execute(pRenderContext, uint3(targetDim, 1));
         }
     }
     // Call shared post-render code.
@@ -329,4 +330,15 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;
     pVars["NRCDataCB"]["gTerminateFootprintThres"] = mNRC.terminate_footprint_thres;
 
+    // set textures & buffers (defined in NrC.slang)
+    pVars["gScreenQueryFactor"] = mNRC.pScreenQueryFactor;
+    pVars["gScreenQueryBias"] = mNRC.pScreenQueryBias;
+    pVars["gInferenceRadianceQuery"] = mNRC.pInferenceRadiaceQuery;
+    pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
+    pVars["gTrainingRadianceSample"] = mNRC.pTrainingRadianceSample;
+
+    mCompositePass["factor"] = mNRC.pScreenQueryFactor;
+    mCompositePass["bias"] = mNRC.pScreenQueryBias;
+    mCompositePass["radiance"] = mNRC.pScreenResult;
+    mCompositePass["output"] = renderData[kNRCResultOutput]->asTexture();
 }

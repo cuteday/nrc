@@ -85,6 +85,7 @@ RWStructuredBuffer<RadianceSample> gTrainingRadianceSample;
 RWStructuredBuffer<RadianceQuery> gInferenceRadianceQuery;
 RWTexture2D<float4> gScreenQueryFactor;
 RWTexture2D<float4> gScreenQueryBias;
+RWTexture2D<float4> gOutputResult;
 
 NRCPathType getNRCPathType(uint2 pixel)
 {

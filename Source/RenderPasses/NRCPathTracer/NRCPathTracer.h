@@ -78,4 +78,6 @@ private:
         Texture::SharedPtr pScreenQueryBias = nullptr;
         Texture::SharedPtr pScreenResult = nullptr;
     } mNRC;
+
+    ComputePass::SharedPtr mCompositePass;
 };

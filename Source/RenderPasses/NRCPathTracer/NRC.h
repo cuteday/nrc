@@ -49,10 +49,10 @@ namespace NRC {
 
         // register interop texture/surface here
         struct {
-            NRC::RadianceQuery* screenQuery;           
+            NRC::RadianceQuery* screenQuery = nullptr;           
             cudaSurfaceObject_t screenResult;       // write inferenced results here
-            NRC::RadianceQuery* trainingQuery;
-            NRC::RadianceSample* trainingSample;
+            NRC::RadianceQuery* trainingQuery = nullptr;
+            NRC::RadianceSample* trainingSample = nullptr;
         }mFalcorResources;
     };
 }

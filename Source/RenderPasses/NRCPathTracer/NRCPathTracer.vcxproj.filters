@@ -40,7 +40,7 @@
     <ShaderSource Include="Debug\NRCPixelStatsShared.slang">
       <Filter>Debug</Filter>
     </ShaderSource>
-    <ShaderSource Include="Composite.slang" />
+    <ShaderSource Include="Composite.cs.slang" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="NN">
