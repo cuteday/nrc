@@ -248,7 +248,7 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             // this takes <0.05ms
             PROFILE("NRCPathTracer::execute()_CounterBuffer");
             pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 0, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
-            pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
+            pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceSample->getUAVCounter().get(), 0, 4);
         }
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");

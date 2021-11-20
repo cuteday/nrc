@@ -16,16 +16,19 @@ namespace NRC {
     struct RadianceQuery
     {
         float3 pos;
+        float _pad0;
         float2 dir;
+        float2 _pad1;
     };
 
     struct RadianceSample
     {
         RadianceQuery query;
         // L_o (scattered radiance) = a * L_i + b
+        int idx;    // which query it belongs to?
         float3 a;   // factor of scatter ray (bsdf sample)
         float3 b;   // the direct sample part
-        int idx;    // which query it belongs to?
+        float _pad0;
     };
 
     class NRCNetwork {
@@ -44,3 +47,4 @@ namespace NRC {
             RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss);
     };
 }
+

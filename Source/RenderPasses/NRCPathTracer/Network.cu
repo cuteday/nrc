@@ -81,32 +81,6 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
     data[data_index + 4] = (T)queries[query_index].dir.y;
 }
 
-// TODO: generate batched random shuffled training data (using a linear congruential generator?
-// TODO: detect samples that are not initialized (e.g. through the UAV counter mapped to cuda device pointer?)
-//template <typename T = float>
-//__global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
-//    NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
-//    T* __restrict__ training_data, T* __restrict__ training_target) {
-//    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-//    if (i + offset > n_elements) return;
-//    uint32_t data_index = i * 5, sample_index = i + offset;
-//    
-//    training_data[data_index + 0] = (T)samples[sample_index].query.pos.x;
-//    training_data[data_index + 1] = (T)samples[sample_index].query.pos.y;
-//    training_data[data_index + 2] = (T)samples[sample_index].query.pos.z;
-//    training_data[data_index + 3] = (T)samples[sample_index].query.dir.x;
-//    training_data[data_index + 4] = (T)samples[sample_index].query.dir.y;
-//
-//    float3 factor = samples[sample_index].a, bias = samples[sample_index].b;
-//    uint32_t output_index = i * 3;
-//    uint32_t pred_index = samples[sample_index].idx >= 0 ? samples[sample_index].idx : 0;
-//    float3 pred_radiance = { self_query_pred[pred_index], self_query_pred[pred_index + 1], self_query_pred[pred_index + 2] };
-//    float3 radiance = vec3_add(vec3_mult(pred_radiance, factor), bias);
-//    training_target[output_index + 0] = (T)radiance.x ;
-//    training_target[output_index + 1] = (T)radiance.y;
-//    training_target[output_index + 2] = (T)radiance.z;
-//}
-
 template <typename T = float>
 __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
     NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
@@ -115,9 +89,9 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
     uint32_t data_index = i * 5, sample_index = i + offset;
-    if (sample_index > *training_sample_counter) return;
+    if (sample_index >= *training_sample_counter) return;
     uint32_t pred_index = samples[sample_index].idx >= 0 ? samples[sample_index].idx : 0;
-    if (pred_index > *self_query_counter) return;
+    if (pred_index >= *self_query_counter) return;
     float3 factor = samples[sample_index].a, bias = samples[sample_index].b;
     uint32_t output_index = i * 3;
 

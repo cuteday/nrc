@@ -511,7 +511,8 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     }
 
     logSuffixPathLength(path.length - inferencePathLength);
-    int queryIndex = needsQuery ? addTrainingQuery(path.origin, -path.dir) : -1;
+    int queryIndex = needsQuery ? (int)addTrainingQuery(path.origin, -path.dir) : -1;
+    print("current query index: ", queryIndex);
 
     for(uint i = 0; i < path.length; i++) {
         // from 0 to length-1 is indeed the best choice, for either [end with RR] or [missed] or [max bounces limit reached]

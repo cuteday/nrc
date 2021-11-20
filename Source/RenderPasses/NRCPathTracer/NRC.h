@@ -29,6 +29,8 @@ namespace NRC {
 
         void inferenceFrame();
 
+        void printStats();
+
         void registerNRCResources(Falcor::Buffer::SharedPtr pScreenQueryBuffer,
             Falcor::Texture::SharedPtr pScreenResultTexture,
             Falcor::Buffer::SharedPtr pTrainingQueryBuffer,
@@ -46,6 +48,12 @@ namespace NRC {
 
     private:
         NRCNetwork::SharedPtr network = nullptr;
+        struct {
+            int n_frames = 0;
+            float training_loss_avg = 0;    // EMA
+            const float ema_factor = 0.8f;
+            const int print_every = 100;
+        }mStats;
 
         struct {
             uint2 screenSize;

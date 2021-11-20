@@ -22,6 +22,12 @@ namespace NRC {
             mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);*/
         network->train(mFalcorResources.trainingQuery, mFalcorResources.trainingQueryCounter,
             mFalcorResources.trainingSample, mFalcorResources.trainingSampleCounter, loss);
+        mStats.n_frames++;
+        mStats.training_loss_avg = mStats.ema_factor * mStats.training_loss_avg + (1 - mStats.ema_factor) * loss;
+
+        if (mStats.n_frames % mStats.print_every == 0) {
+            printStats();
+        }
     }
 
     void NRCInterface::inferenceFrame()
@@ -29,5 +35,11 @@ namespace NRC {
         int n_queries = mParameters.screenSize.x * mParameters.screenSize.y;
         network->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
             mParameters.screenSize.x, mParameters.screenSize.y);
+    }
+    void NRCInterface::printStats()
+    {
+        std::stringstream ss;
+        ss << "Current frame: " << mStats.n_frames << "loss: " << mStats.training_loss_avg;
+        Falcor::logInfo(ss.str());
     }
 }

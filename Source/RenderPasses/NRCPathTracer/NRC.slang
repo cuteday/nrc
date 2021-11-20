@@ -56,16 +56,19 @@ void NRCSetPixel(uint2 pixel)
 struct RadianceQuery
 {
     float3 pos;
+    float _pad0;
     float2 dir;
+    float2 _pad1;
 };
 
 struct RadianceSample
 {
     RadianceQuery query;
     // L_o (scattered radiance) = a * L_i + b
+    int idx;    // which query it belongs to?
     float3 a;   // factor of scatter ray (bsdf sample)
     float3 b;   // the direct sample part
-    int idx;    // which query it belongs to?
+    float _pad0;
 };
 
 struct PathVertexRecord
@@ -110,7 +113,6 @@ uint2 getCurrentPixelNRC(uint2 launchIndex)
     return launchIndex;
 }
 
-//bool isTrainingPath(uint2 pixel)
 bool isTrainingPath()
 {
     uint2 rel_coord = gNRCPixel - gNRCTrainingPathOffset;
@@ -120,7 +122,6 @@ bool isTrainingPath()
     return false;
 }
 
-//bool isTrainingPathRR(uint2 pixel)
 bool isTrainingPathRR()
 {
     uint2 rel_coord = gNRCPixel - gNRCTrainingPathOffset;
@@ -132,14 +133,18 @@ bool isTrainingPathRR()
 
 PathVertexRecord generatePathVertexRecord(PathData path)
 {
-    RadianceQuery query = { path.origin, world_to_latlong_map(-path.dir) };
+    RadianceQuery query = { };
+    query.pos = path.origin;
+    query.dir = world_to_latlong_map(-path.dir);
     PathVertexRecord record = { query, path.thp, path.L };
     return record;
 }
 
 void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bias)
 {
-    RadianceQuery query = { pos, world_to_latlong_map(dir) };
+    RadianceQuery query = { };
+    query.pos = pos;
+    query.dir = world_to_latlong_map(dir);
     uint2 frameDim = gNRCScreenSize;
     int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
     gScreenQueryFactor[gNRCPixel] = float4(factor, 1.0);
@@ -147,18 +152,24 @@ void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bia
     gInferenceRadianceQuery[index] = query;
 }
 
-int addTrainingQuery(float3 pos, float3 dir)
+uint addTrainingQuery(float3 pos, float3 dir)
 {
-    int idx = gTrainingRadianceQuery.IncrementCounter();
-    RadianceQuery query = { pos, world_to_latlong_map(dir) };
+    uint idx = gTrainingRadianceQuery.IncrementCounter();
+    RadianceQuery query = { };
+    query.pos = pos;
+    query.dir = world_to_latlong_map(dir);
     gTrainingRadianceQuery[idx] = query;
     return idx;
 }
 
 void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
 {
-    int idx = gTrainingRadianceSample.IncrementCounter();
-    RadianceSample record = { query, a, b, queryIndex };
-    gTrainingRadianceSample[idx] = record;
+    uint idx = gTrainingRadianceSample.IncrementCounter();
+    RadianceSample sample = { };
+    sample.query = query;
+    sample.idx = queryIndex;
+    sample.a = a;
+    sample.b = b;
+    gTrainingRadianceSample[idx] = sample;
 }
 
