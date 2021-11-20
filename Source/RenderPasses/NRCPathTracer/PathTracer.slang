@@ -491,8 +491,11 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
             || path.length == NRC_MAX_INFERENCE_BOUNCES
             || path.nonSpecularBounces > kMaxNonSpecularBounces;
 
+        // this "if" means we only takes the contribution from light sources into account.  [kUseMIS is enabled by default so ignore this]
         if (isLastVertex && (kUseNEE && !kUseMIS && path.isLightSamplable())) { needsQuery = false; break; }
+        // terminate path at the first non specular vertex, after the path became specular. [kDisableCaustics is disabled by default]
         if (kDisableCaustics && path.isSpecular() && path.nonSpecularBounces > 0) { needsQuery = false; break; }
+        // this "if" miss the next ray according to bsdf importance sampling is missed.
         if (!traceScatterRay(path.origin, path.dir, path.interiorList, path.hit)) { needsQuery = false; break; }
 
         const bool validHit = path.hit.isValid();

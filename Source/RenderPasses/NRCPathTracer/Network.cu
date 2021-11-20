@@ -197,5 +197,6 @@ namespace NRC {
             training_sample_counter, self_query_counter);
         mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
         cudaStreamSynchronize(training_stream);
+        std::cout << "Loss at current step: " << loss << std::endl;
     }
 }
