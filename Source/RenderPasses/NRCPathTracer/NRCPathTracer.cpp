@@ -56,6 +56,7 @@ NRCPathTracer::NRCPathTracer(const Dictionary& dict)
     : PathTracer(dict, kOutputChannels)
 {
     mTracer.pNRCPixelStats = NRCPixelStats::create();
+    mHaltonSampler = HaltonSamplePattern::create(0);
     assert(mTracer.pNRCPixelStats);
 }
 
@@ -331,10 +332,10 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     auto pVars = mTracer.pVars;
     // width * height
     pVars["NRCDataCB"]["gNRCEnable"] = mNRC.enableNRC;
+    pVars["NRCDataCB"]["gVisualizeMode"] = mNRC.visualizeMode;
     pVars["NRCDataCB"]["gIsTrainingPass"] = false;      // reset this flag for next frame
     pVars["NRCDataCB"]["gNRCScreenSize"] = renderData.getDefaultTextureDims();
-    pVars["NRCDataCB"]["gNRCTrainingPathOffset"] = uint2(std::rand() / (float)RAND_MAX * Parameters::trainingPathStride.x,
-        std::rand() / (float)RAND_MAX * Parameters::trainingPathStride.y);
+    pVars["NRCDataCB"]["gNRCTrainingPathOffset"] = uint2((1.f+mHaltonSampler->next()) * (float2)Parameters::trainingPathStride);
     pVars["NRCDataCB"]["gNRCTrainingPathStride"] = Parameters::trainingPathStride;
     pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = Parameters::trainingPathStrideRR;
     pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;

@@ -118,7 +118,7 @@ __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
     radiance.x = data[index + 0];
     radiance.x = data[index + 1];
     radiance.x = data[index + 2];
-    radiance.w = 0.0f;
+    radiance.w = 1.f;
     surf2Dwrite(radiance, output, sizeof(float4) * x, y);
 }
 

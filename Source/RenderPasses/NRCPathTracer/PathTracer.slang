@@ -436,7 +436,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         // the direction is generated at the previous GenerateScatterRay call
         float3 scatterDir = -path.dir;
         float3 scatterOrigin = path.origin;
-        float3 throughput = normalTerminate ? path.thp : float3(0.0);       // the path throughput is updated in generate scatter ray.
+        float3 throughput = normalTerminate ? path.thp : float3(0);       // the path throughput is updated in generate scatter ray.
         float3 bias = path.L;               // the L already contains the self emission at the hit vertex
         writeScreenInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
     }
@@ -526,4 +526,9 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     }
 
     return queryRadiance;
+}
+
+float3 visualizeNRC(const PathTracerData pt, ShadingData sd, inout PathData path){
+    //float3 primaryRayDir = -sd.fromLocal(sd.V);
+    writeScreenInferenceQuery(sd.posW, sd.fromLocal(sd.V), float3(1.0), float3(0.0));
 }

@@ -15,6 +15,7 @@ import RenderPasses.Shared.PathTracer.PathData;
 cbuffer NRCDataCB
 {   // the constant buffer is globally shared between shader files which included this file
     bool gNRCEnable;
+    bool gVisualizeMode;
     bool gIsTrainingPass;               // If we are in the training pass, dispatch training suffix via sparse sampling
     float gNRCAbsorptionProb;
     float gTerminateFootprintThres;     // hyperparam for ray termination heuristic
@@ -38,6 +39,7 @@ struct NRCRayFootprint{
     { 
         NdotV = max(NdotV, 0.01);
         float current = distance(u, v) / pdf / NdotV;
+        if (pdf == 0) current = 0;      // sampled using a delta func.
         return { spread + current };
     }
 
@@ -147,7 +149,7 @@ void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bia
     query.dir = world_to_latlong_map(dir);
     uint2 frameDim = gNRCScreenSize;
     int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
-    gScreenQueryFactor[gNRCPixel] = float4(factor, 1.0);
+    gScreenQueryFactor[gNRCPixel] = float4(factor, 0);
     gScreenQueryBias[gNRCPixel] = float4(bias, 1.0);
     gInferenceRadianceQuery[index] = query;
 }
@@ -172,4 +174,3 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
     sample.b = b;
     gTrainingRadianceSample[idx] = sample;
 }
-

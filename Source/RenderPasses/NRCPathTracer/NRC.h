@@ -38,12 +38,17 @@ namespace NRC {
             Falcor::Buffer::SharedPtr pTrainingQueryBuffer,
             Falcor::Buffer::SharedPtr pTrainingSampleBuffer,
             Falcor::Buffer::SharedPtr pSharedCounterBuffer) {
+
             mParameters.screenSize = uint2(pScreenResultTexture->getWidth(), pScreenResultTexture->getHeight());
-            mFalcorResources.screenQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pScreenQueryBuffer);
             mFalcorResources.screenResult = FalcorCUDA::mapTextureToSurfaceObject(pScreenResultTexture, cudaArrayColorAttachment);
+            mFalcorResources.screenQuery = (NRC::RadianceQuery*)pScreenQueryBuffer->getCUDADeviceAddress();
+            mFalcorResources.trainingQuery = (NRC::RadianceQuery*)pTrainingQueryBuffer->getCUDADeviceAddress();
+            mFalcorResources.trainingSample = (NRC::RadianceSample*)pTrainingSampleBuffer->getCUDADeviceAddress();
+            uint32_t* counterBuffer = (uint32_t*)pSharedCounterBuffer->getCUDADeviceAddress();
+            /*mFalcorResources.screenQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pScreenQueryBuffer);
             mFalcorResources.trainingQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pTrainingQueryBuffer);
             mFalcorResources.trainingSample = (NRC::RadianceSample*)FalcorCUDA::importResourceToDevicePointer(pTrainingSampleBuffer);
-            uint32_t* counterBuffer = (uint32_t*)FalcorCUDA::importResourceToDevicePointer(pSharedCounterBuffer);
+            uint32_t* counterBuffer = (uint32_t*)FalcorCUDA::importResourceToDevicePointer(pSharedCounterBuffer);*/
             mFalcorResources.trainingQueryCounter = &counterBuffer[0];
             mFalcorResources.trainingSampleCounter = &counterBuffer[1];
         }      
