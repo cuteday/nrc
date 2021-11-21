@@ -60,13 +60,8 @@ private:
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
 
         bool enableNRC = false;
-        //uint2 trainingPathStride = uint2(6, 6);
-        //uint2 trainingPathStrideRR = uint2(24 * 24);
         float prob_rr_suffix_absorption = 0.2f;
         float terminate_footprint_thres = 50.f;
-        //uint max_inference_query_size = 1920 * 1080;
-        //uint max_training_query_size = 1 << 16;     // ~57,600
-        //uint max_training_record_size = 1920 * 1080 / 36 * 10;
         int max_training_bounces = 5;               // max path segments for training suffix
         int max_training_rr_bounces = 10;
         int max_inference_bounces = 5;

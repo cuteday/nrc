@@ -7,7 +7,10 @@ def render_graph_PathTracerGraph():
     AccumulatePass = createPass("AccumulatePass", {'enabled': True})
     g.addPass(AccumulatePass, "AccumulatePass")
     ToneMappingPass = createPass("ToneMapper", {'autoExposure': False, 'exposureCompensation': 0.0})
+    # ToneMappingPass2 = createPass("ToneMapper", {'autoExposure': False, 'exposureCompensation': 0.0})
+    # ToneMappingPass3 = createPass("ToneMapper", {'autoExposure': False, 'exposureCompensation': 0.0})
     g.addPass(ToneMappingPass, "ToneMappingPass")
+    g.addPass(ToneMappingPass, "ToneMappingPass2")
     GBufferRT = createPass("GBufferRT", {'forceCullMode': False, 'cull': CullMode.CullBack, 'samplePattern': SamplePattern.Stratified, 'sampleCount': 16})
     g.addPass(GBufferRT, "GBufferRT")
     NRCPathTracer = createPass("NRCPathTracer", {'params': PathTracerParams(useVBuffer=0)})
@@ -24,7 +27,9 @@ def render_graph_PathTracerGraph():
     g.addEdge("GBufferRT.matlExtra", "NRCPathTracer.mtlParams")
     g.addEdge("NRCPathTracer.color", "AccumulatePass.input")
     g.addEdge("AccumulatePass.output", "ToneMappingPass.src")
+    g.addEdge("NRCPathTracer.result", "ToneMappingPass2.src")
     g.markOutput("ToneMappingPass.dst")
+    g.markOutput("ToneMappingPass2.dst")
     return g
 
 PathTracerGraph = render_graph_PathTracerGraph()

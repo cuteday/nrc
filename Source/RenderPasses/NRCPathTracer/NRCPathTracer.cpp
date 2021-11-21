@@ -175,6 +175,9 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
             // widget.group creates a sub widget.
             mTracer.pNRCPixelStats->renderUI(logGroup);
         }
+        if (widget.button("reset network")) {
+            mNRC.pNRC->resetParameters();
+        }
     }
 
 }

@@ -31,6 +31,8 @@ namespace NRC {
 
         void printStats();
 
+        void resetParameters();
+
         void registerNRCResources(Falcor::Buffer::SharedPtr pScreenQueryBuffer,
             Falcor::Texture::SharedPtr pScreenResultTexture,
             Falcor::Buffer::SharedPtr pTrainingQueryBuffer,

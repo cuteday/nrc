@@ -122,6 +122,15 @@ __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
     surf2Dwrite(radiance, output, sizeof(float4) * x, y);
 }
 
+template <typename T = float>
+__global__ void chkNaN(uint32_t n_elements, T* __restrict__ data) {
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i > n_elements) return;
+    if (isnan(data[i]) || isinf(data[i])) {
+        data[i] = (T)0.f;
+    }
+}
+
 namespace NRC {
     NRCNetwork::NRCNetwork()
     {
@@ -166,6 +175,13 @@ namespace NRC {
         mMemory->training_self_pred = new GPUMatrix<float>(output_dim, self_query_batch_size);
     }
 
+    void NRCNetwork::reset()
+    {
+        cudaStreamSynchronize(training_stream);
+        cudaStreamSynchronize(inference_stream);
+        mNetwork->trainer->initialize_params(seed);
+    }
+
     void NRCNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,
         unsigned int width, unsigned int height)
     {
@@ -189,12 +205,16 @@ namespace NRC {
         // self query
         linear_kernel(generateBatchSequential<output_dim>, 0, training_stream, self_query_batch_size,
             0, self_queries, mMemory->training_self_query->data());
+
         mNetwork->network->inference(training_stream, *mMemory->training_self_query, *mMemory->training_self_pred);
+
         // training
         linear_kernel(generateTrainingDataFromSamples<float>, 0, training_stream, batch_size,
             0, training_samples, mMemory->training_self_pred->data(),
             mMemory->training_data->data(), mMemory->training_target->data(),
             training_sample_counter, self_query_counter);
+        linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_data->n_elements(), mMemory->training_data->data());
+        linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_target->n_elements(), mMemory->training_target->data());
         mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
         cudaStreamSynchronize(training_stream);
         std::cout << "Loss at current step: " << loss << std::endl;

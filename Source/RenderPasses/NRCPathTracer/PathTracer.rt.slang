@@ -169,7 +169,11 @@ void rayGen()
         outColor = evalBackground(-sd.V);
         outAlbedo = outColor.rgb;
         outAlpha = kForceAlphaOne ? 1.f : 0.f;
-    }
+#ifdef NRC_ENABLE
+        gScreenQueryFactor[currentPixel] = float4(0.0);
+        gScreenQueryBias[currentPixel] = float4(outColor, 1.0);
+#endif
+}
 
     // DEBUG
     assert(!any(isnan(outColor)));

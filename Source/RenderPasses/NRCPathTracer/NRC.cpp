@@ -42,4 +42,9 @@ namespace NRC {
         ss << "Current frame: " << mStats.n_frames << "loss: " << mStats.training_loss_avg;
         Falcor::logInfo(ss.str());
     }
+
+    void NRCInterface::resetParameters()
+    {
+        network->reset();
+    }
 }

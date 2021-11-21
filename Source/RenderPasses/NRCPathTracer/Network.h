@@ -42,9 +42,14 @@ namespace NRC {
         ~NRCNetwork();
 
         void initializeNetwork();
+        void reset();
+
         __host__ void inference(RadianceQuery* queries, cudaSurfaceObject_t output, unsigned int width, unsigned int height);
         __host__ void train(RadianceQuery* self_queries, uint32_t* self_query_counter,
             RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss);
+
+    private:
+        uint32_t seed = 7272u;
     };
 }
 
