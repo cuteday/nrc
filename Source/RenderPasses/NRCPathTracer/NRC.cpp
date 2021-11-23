@@ -7,7 +7,7 @@ namespace NRC {
 
     NRCInterface::NRCInterface(){
         if (!FalcorCUDA::initCUDA()) {
-            Falcor::logError("Cuda init failed");
+            Falcor::logFatal("Cuda init failed");
             return;
         }
         logInfo("NRCInterface::working directory: " + std::filesystem::current_path().string());
@@ -36,6 +36,7 @@ namespace NRC {
         network->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
             mParameters.screenSize.x, mParameters.screenSize.y);
     }
+
     void NRCInterface::printStats()
     {
         std::stringstream ss;

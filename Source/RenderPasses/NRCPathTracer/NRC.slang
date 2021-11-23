@@ -150,7 +150,7 @@ void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bia
     uint2 frameDim = gNRCScreenSize;
     int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
     gScreenQueryFactor[gNRCPixel] = float4(factor, 0);
-    gScreenQueryBias[gNRCPixel] = float4(bias, 1.0);
+    gScreenQueryBias[gNRCPixel] = float4(bias, 1);
     gInferenceRadianceQuery[index] = query;
 }
 

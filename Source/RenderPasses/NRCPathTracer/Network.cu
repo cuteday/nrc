@@ -15,13 +15,12 @@ using precision_t = tcnn::network_precision_t;
 namespace {
 
     // 4 steps each frame, with 16384 samples per batch
-    unsigned int resolution = 1920 * 1080;
-    unsigned int padded_resolution = next_multiple(resolution, 256u);
+    unsigned int resolution = 1920 * 1080;    // is a multiple of 256
     const unsigned int batch_size = 1 << 14;
     const unsigned int self_query_batch_size = 1 << 16;     // ~ 57600
     const unsigned int input_dim = 5;         // pos, dir
     const unsigned int output_dim = 3;        // RGB
-    const unsigned int alignment = 16;        // input dim alignment
+    //const unsigned int alignment = 16;        // input dim alignment
     const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc.json";
 
     // cuda related
@@ -114,12 +113,23 @@ __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int x = i % width, y = i / width;
     unsigned int index = i * 3;
-    float4 radiance;
-    radiance.x = data[index + 0];
-    radiance.x = data[index + 1];
-    radiance.x = data[index + 2];
-    radiance.w = 1.f;
-    surf2Dwrite(radiance, output, sizeof(float4) * x, y);
+    float4 radiance = { data[index + 0] , data[index + 1], data[index + 2], 1.f };
+    surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
+}
+
+template <class T>
+__global__ void mapPredRadianceToScreen2(T* __restrict__ data, cudaSurfaceObject_t output,
+    unsigned int width, unsigned int height) {
+    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x < width && y < height) {
+        unsigned int index = (y * width + x) * 3;
+        //float4 radiance = { data[index + 0],data[index + 1],data[index + 2],1.f };
+
+        float greyScale = ((float)x / width) * ((float)y / height);
+        float4 radiance = { greyScale, greyScale, greyScale, 1.f };
+        surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
+    }
 }
 
 template <typename T = float>
@@ -169,8 +179,8 @@ namespace NRC {
         mMemory->training_data = new GPUMatrix<float>(input_dim, batch_size);
         mMemory->training_target = new GPUMatrix<float>(output_dim, batch_size);
         mMemory->pred_target = new GPUMatrix<float>(output_dim, batch_size);
-        mMemory->inference_data = new GPUMatrix<float>(input_dim, padded_resolution);
-        mMemory->inference_target = new GPUMatrix<float>(output_dim, padded_resolution);
+        mMemory->inference_data = new GPUMatrix<float>(input_dim, resolution);
+        mMemory->inference_target = new GPUMatrix<float>(output_dim, resolution);
         mMemory->training_self_query = new GPUMatrix<float>(input_dim, self_query_batch_size);
         mMemory->training_self_pred = new GPUMatrix<float>(output_dim, self_query_batch_size);
     }
@@ -195,7 +205,12 @@ namespace NRC {
         
         mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
 
-        linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
+        //linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
+
+        dim3 dimBlock(16, 16), dimGrid(div_round_up(width, 16u), div_round_up(height, 16u));
+        mapPredRadianceToScreen2<float> <<<dimGrid, dimBlock, 0, inference_stream >>>
+            (mMemory->inference_target->data(), output, width, height);
+
         cudaStreamSynchronize(inference_stream);
     }
 

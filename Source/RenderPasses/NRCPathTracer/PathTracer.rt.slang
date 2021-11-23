@@ -145,7 +145,7 @@ void rayGen()
             // Trace the path.
             float3 L;
 #ifdef NRC_ENABLE
-            if (gVisualizeModel) L = visualizeNRC(gData, sd, path);
+            if (gVisualizeMode) L = visualizeNRC(sd);
             else L = tracePathNRC(gData, sd, path);
 #else
             L = tracePath(gData, sd, path);

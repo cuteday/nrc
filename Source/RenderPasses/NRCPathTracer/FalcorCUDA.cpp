@@ -154,6 +154,8 @@ namespace FalcorCUDA
 
         cudaSurfaceObject_t surface;
         CUDA_CHECK_SUCCESS(cudaCreateSurfaceObject(&surface, &resDesc));
+        if (surface == 0)
+            Falcor::logError("FalcorCUDA::map texture to surface object failed.");
         return surface;
     }
 }

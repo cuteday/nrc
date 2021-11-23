@@ -23,13 +23,15 @@ namespace
     const std::string kAlbedoOutput = "albedo";
     const std::string kTimeOutput = "time";
     const std::string kNRCResultOutput = "result";
+    const std::string kNRCFactorOutput = "factor";
 
     const Falcor::ChannelList kOutputChannels =
     {
-        { kColorOutput,     "gOutputColor",               "Output color (linear)", true /* optional */                              },
+        { kColorOutput,     "gOutputColor",               "Output color (linear) with contribution from NRC excluded", true /* optional */                              },
         { kAlbedoOutput,    "gOutputAlbedo",              "Surface albedo (base color) or background color", true /* optional */    },
         { kTimeOutput,      "gOutputTime",                "Per-pixel execution time", true /* optional */, ResourceFormat::R32Uint  },
-        { kNRCResultOutput, "gOutputResult",              "NRC predicted radiance composited", true }
+        { kNRCResultOutput, "gOutputResult",              "NRC predicted radiance composited with outputColor", true                },
+        { kNRCFactorOutput, "gScreenQueryFactor",         "factor per pixel for NRC's contribution", true, ResourceFormat::RGBA32Float}
     };
 };
 
@@ -104,6 +106,12 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             mNRC.pSharedCounterBuffer);
 
     }
+    if (mNRCOptionChanged) {
+        if (mNRC.enableNRC)
+            mTracer.pProgram->addDefine("NRC_ENABLE");
+        else mTracer.pProgram->removeDefine("NRC_ENABLE");
+        mNRCOptionChanged = false;
+    }
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceSample, 0);
     mTracer.pNRCPixelStats->beginFrame(pRenderContext, renderData.getDefaultTextureDims());
@@ -161,9 +169,7 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
 {
     PathTracer::renderUI(widget);
     if (widget.checkbox("Enable NRC", mNRC.enableNRC)) {
-        if (mNRC.enableNRC)
-            mTracer.pProgram->addDefine("NRC_ENABLE");
-        else mTracer.pProgram->removeDefine("NRC_ENABLE");
+        mNRCOptionChanged = true;
     }
     if(mNRC.enableNRC){
         if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
@@ -176,6 +182,8 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
             // widget.group creates a sub widget.
             mTracer.pNRCPixelStats->renderUI(logGroup);
         }
+        if (widget.checkbox("visualize mode", mNRC.visualizeMode)){}
+        widget.tooltip("Query the NRC at primary vertices.");
         if (widget.button("reset network")) {
             mNRC.pNRC->resetParameters();
         }
@@ -254,12 +262,14 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 0, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
             pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceSample->getUAVCounter().get(), 0, 4);
         }
+        if (!mNRC.visualizeMode)
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
             // no, we make training process an ansynchronous step.
             mNRC.pNRC->trainFrame();
         }
         {
+            // this takes ~12ms
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
             mNRC.pNRC->inferenceFrame();
         }
@@ -342,8 +352,10 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gTerminateFootprintThres"] = mNRC.terminate_footprint_thres;
 
     // set textures & buffers (defined in NrC.slang)
-    pVars["gScreenQueryFactor"] = mNRC.pScreenQueryFactor;
+    //pVars["gScreenQueryFactor"] = mNRC.pScreenQueryFactor;
+    pVars["gScreenQueryFactor"] = renderData[kNRCFactorOutput]->asTexture();
     pVars["gScreenQueryBias"] = mNRC.pScreenQueryBias;
+    //pVars["gScreenQueryBias"] = renderData[kColorOutput]->asTexture();
     pVars["gInferenceRadianceQuery"] = mNRC.pInferenceRadiaceQuery;
     pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
     pVars["gTrainingRadianceSample"] = mNRC.pTrainingRadianceSample;
@@ -352,4 +364,5 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     mCompositePass["bias"] = mNRC.pScreenQueryBias;
     mCompositePass["radiance"] = mNRC.pScreenResult;
     mCompositePass["output"] = renderData[kNRCResultOutput]->asTexture();
+    mCompositePass["factor"] = renderData[kNRCFactorOutput]->asTexture();
 }

@@ -59,7 +59,7 @@ private:
     struct {
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
 
-        bool enableNRC = false;
+        bool enableNRC = true;
         bool visualizeMode = false;
         float prob_rr_suffix_absorption = 0.2f;
         float terminate_footprint_thres = 50.f;
@@ -77,6 +77,7 @@ private:
 
     } mNRC;
 
+    bool mNRCOptionChanged = true;
     ComputePass::SharedPtr mCompositePass;
     HaltonSamplePattern::SharedPtr mHaltonSampler;
 };
