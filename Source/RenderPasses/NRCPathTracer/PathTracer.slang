@@ -444,7 +444,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     const float3 queryRadiance = path.L;
     const uint inferencePathLength = path.length;
     logInferencePathLength(inferencePathLength);
-    if (!normalTerminate) return queryRadiance;   // we don't need to query the NRC...
+    if (!normalTerminate && !gIsTrainingPath) return queryRadiance;   // we don't need to query the NRC...
     /* Path enlongation! (for RR or terminate heuristic) */
     if (!gIsTrainingPass) return queryRadiance;
     // save outputs at the query vertex
@@ -502,6 +502,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
 
         if (validHit)
         {   // Handle current intersection, update path data & shading data for next scatter. Here the emissive radiance is added to path contribution.
+            // path length is increased here
             handleHit(pt, sd, path);
         }
         else
@@ -514,7 +515,10 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     }
 
     logSuffixPathLength(path.length - inferencePathLength);
-    int queryIndex = needsQuery ? (int)addTrainingQuery(path.origin, -path.dir) : -1;
+    int queryIndex = -1;
+    if (needsQuery) {
+        queryIndex = (int)addTrainingQuery(pathRecords.origin, -pathRecords.dir);
+    }
     print("current query index: ", queryIndex);
 
     for(uint i = 0; i < path.length; i++) {

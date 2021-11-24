@@ -1,5 +1,8 @@
 #include "stdafx.h"
+
 #include "NRCPixelStats.h"
+#include "../Parameters.h"
+
 #include <sstream>
 #include <iomanip>
 
@@ -162,7 +165,8 @@ namespace Falcor
                 assert(numPixels > 0);
 
                 mStats.avgInferencePathLength = (float)totalInferencePathLength / numPixels;
-                mStats.avgSuffixPathLength = (float)totalSuffixPathLength / numPixels;
+                mStats.avgSuffixPathLength = (float)totalSuffixPathLength / numPixels *
+                    NRC::Parameters::trainingPathStride.x * NRC::Parameters::trainingPathStride.y;
 
                 mpReductionResult->unmap();
                 mStatsValid = true;
