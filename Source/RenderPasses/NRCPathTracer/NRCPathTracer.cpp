@@ -317,6 +317,9 @@ void NRCPathTracer::prepareVars()
 
     // Bind the parameter block to the global program variables.
     mTracer.pVars->setParameterBlock(kParameterBlockName, mTracer.pParameterBlock);
+
+    // set some static parameters.
+
 }
 
 void NRCPathTracer::setTracerData(const RenderData& renderData)
@@ -350,6 +353,9 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = Parameters::trainingPathStrideRR;
     pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;
     pVars["NRCDataCB"]["gTerminateFootprintThres"] = mNRC.terminate_footprint_thres;
+    // scene AABB for normalizing coordinates
+    pVars["NRCDataCB"]["gSceneAABBCenter"] = mpScene->getSceneBounds().center();
+    pVars["NRCDataCB"]["gSceneAABBExtent"] = mpScene->getSceneBounds().extent();
 
     // set textures & buffers (defined in NrC.slang)
     //pVars["gScreenQueryFactor"] = mNRC.pScreenQueryFactor;

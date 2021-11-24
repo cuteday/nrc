@@ -15,9 +15,9 @@
 namespace NRC {
     struct RadianceQuery
     {
-        float3 pos;
+        float3 pos;     // the frequency encoding needs inputs to be mapped into [-1, 1]
         float _pad0;
-        float2 dir;
+        float2 dir;     // the oneblob encoding needs inputs to be mapped in [0, 1]
         float2 _pad1;
     };
 

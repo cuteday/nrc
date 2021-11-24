@@ -23,6 +23,9 @@ cbuffer NRCDataCB
     uint2 gNRCTrainingPathStride;       // uniform sparse sample paths for training
     uint2 gNRCTrainingPathOffset;       // random offset each frame, for the sparse sample
     uint2 gNRCTrainingPathStrideRR;     // training paths ending with russian roulette
+
+    float3 gSceneAABBCenter;             
+    float3 gSceneAABBExtent;
 };
 
 enum NRCPathType
@@ -56,7 +59,7 @@ void NRCSetPixel(uint2 pixel)
 }
 
 struct RadianceQuery
-{
+{   // 32byte
     float3 pos;
     float _pad0;
     float2 dir;
@@ -64,7 +67,7 @@ struct RadianceQuery
 };
 
 struct RadianceSample
-{
+{   // 64byte
     RadianceQuery query;
     // L_o (scattered radiance) = a * L_i + b
     int idx;    // which query it belongs to?
@@ -91,6 +94,13 @@ RWStructuredBuffer<RadianceQuery> gInferenceRadianceQuery;
 RWTexture2D<float4> gScreenQueryFactor;
 RWTexture2D<float4> gScreenQueryBias;
 RWTexture2D<float4> gOutputResult;
+
+float3 normalizeCoord(float3 x)
+{
+    //return x;
+    //return (x - gSceneAABBCenter) / gSceneAABBExtent + 1.0;
+    return (x - gSceneAABBCenter) * 2 / gSceneAABBExtent; 
+}
 
 NRCPathType getNRCPathType(uint2 pixel)
 {
@@ -136,7 +146,7 @@ bool isTrainingPathRR()
 PathVertexRecord generatePathVertexRecord(PathData path)
 {
     RadianceQuery query = { };
-    query.pos = path.origin;
+    query.pos = normalizeCoord(path.origin);
     query.dir = world_to_latlong_map(-path.dir);
     PathVertexRecord record = { query, path.thp, path.L };
     return record;
@@ -145,7 +155,7 @@ PathVertexRecord generatePathVertexRecord(PathData path)
 void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bias)
 {
     RadianceQuery query = { };
-    query.pos = pos;
+    query.pos = normalizeCoord(pos);
     query.dir = world_to_latlong_map(dir);
     uint2 frameDim = gNRCScreenSize;
     int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
@@ -158,7 +168,7 @@ uint addTrainingQuery(float3 pos, float3 dir)
 {
     uint idx = gTrainingRadianceQuery.IncrementCounter();
     RadianceQuery query = { };
-    query.pos = pos;
+    query.pos = normalizeCoord(pos);
     query.dir = world_to_latlong_map(dir);
     gTrainingRadianceQuery[idx] = query;
     return idx;
