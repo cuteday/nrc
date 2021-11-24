@@ -176,6 +176,9 @@ uint addTrainingQuery(float3 pos, float3 dir)
 
 void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
 {
+    if (any(isnan(a)) || any(isnan(b)) || any(isinf(a)) || any(isinf(b)))
+        // TODO: is isnan() in hlsl works properly?
+        return;
     uint idx = gTrainingRadianceSample.IncrementCounter();
     RadianceSample sample = { };
     sample.query = query;

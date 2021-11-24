@@ -91,10 +91,10 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
     uint32_t* training_sample_counter, uint32_t* self_query_counter) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
-    uint32_t data_index = i * 5, sample_index = i + offset;
-    uint32_t pred_index = samples[sample_index].idx >= 0 ? samples[sample_index].idx : 0;
+    int data_index = i * 5, sample_index = i + offset;
+    int pred_index = samples[sample_index].idx; // pred_index == -1 if a self-query is not needed.
 
-    if (sample_index < *training_sample_counter && pred_index < *self_query_counter) {
+    if (sample_index < *training_sample_counter) {
         float3 factor = samples[sample_index].a, bias = samples[sample_index].b;
         uint32_t output_index = i * 3;
 
@@ -104,7 +104,9 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
         training_data[data_index + 3] = (T)samples[sample_index].query.dir.x;
         training_data[data_index + 4] = (T)samples[sample_index].query.dir.y;
 
-        float3 pred_radiance = { self_query_pred[pred_index], self_query_pred[pred_index + 1], self_query_pred[pred_index + 2] };
+        float3 pred_radiance = { };
+        if (pred_index >= 0)    // else the sample doesn't contain a self query.
+            pred_radiance = { self_query_pred[pred_index], self_query_pred[pred_index + 1], self_query_pred[pred_index + 2] };
         float3 radiance = vec3_add(vec3_mult(pred_radiance, factor), bias);
         training_target[output_index + 0] = (T)radiance.x;
         training_target[output_index + 1] = (T)radiance.y;
