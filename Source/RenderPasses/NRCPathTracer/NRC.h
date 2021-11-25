@@ -53,7 +53,7 @@ namespace NRC {
             mFalcorResources.trainingSampleCounter = &counterBuffer[1];
         }      
 
-    private:
+//    private:
         NRCNetwork::SharedPtr network = nullptr;
         struct {
             int n_frames = 0;

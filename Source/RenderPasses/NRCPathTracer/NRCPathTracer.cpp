@@ -262,6 +262,14 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 0, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
             pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceSample->getUAVCounter().get(), 0, 4);
         }
+        {
+            /* Test code: copy one variable from device to host costs ~1.5ms. */
+            //PROFILE("NRCPathTracer::execute()_CUDA_memcpy_counter");
+            //uint32_t sampleCounter;
+            //cudaMemcpy(&sampleCounter, mNRC.pNRC->mFalcorResources.trainingSampleCounter, sizeof(float), cudaMemcpyDeviceToHost);
+            //cudaMemcpy(&queryCounter, mNRC.pNRC->mFalcorResources.trainingQueryCounter, sizeof(float), cudaMemcpyDeviceToHost);
+            //std::cout << "sample count: " << sampleCounter << std::endl;
+        }
         if (!mNRC.visualizeMode)
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");

@@ -18,12 +18,12 @@ using precision_t = tcnn::network_precision_t;
 namespace {
 
     // 4 steps each frame, with 16384 samples per batch
-    unsigned int resolution = 1920 * 1080;    // is a multiple of 256
-    const unsigned int batch_size = 1 << 14;
-    const unsigned int self_query_batch_size = 1 << 16;     // ~ 57600
-    const unsigned int input_dim = 5;         // pos, dir
-    const unsigned int output_dim = 3;        // RGB
-    //const unsigned int alignment = 16;        // input dim alignment
+    uint32_t resolution = 1920 * 1080;    // is a multiple of 256
+    const uint32_t batch_size = 1 << 14;
+    const uint32_t self_query_batch_size = 1 << 16;     // ~ 57600
+    const uint32_t input_dim = 5;         // pos, dir
+    const uint32_t output_dim = 3;        // RGB
+    //const uint32_t alignment = 16;        // input dim alignment
     const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc.json";
 
     // cuda related
@@ -84,14 +84,14 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
     }
 }
 
-template <typename T = float>
+template <uint32_t stride = 5, typename T = float>
 __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
     NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
     T* __restrict__ training_data, T* __restrict__ training_target,
-    uint32_t* training_sample_counter, uint32_t* self_query_counter) {
+    uint32_t* training_sample_counter) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
-    int data_index = i * 5, sample_index = i + offset;
+    int data_index = stride * 5, sample_index = i + offset;
     int pred_index = samples[sample_index].idx; // pred_index == -1 if a self-query is not needed.
 
     if (sample_index < *training_sample_counter) {
@@ -118,22 +118,22 @@ template <typename T = float>
 __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
     T* __restrict__ data, cudaSurfaceObject_t output) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int x = i % width, y = i / width;
-    unsigned int index = i * 3;
+    uint32_t x = i % width, y = i / width;
+    uint32_t index = i * 3;
     float4 radiance = { data[index + 0] , data[index + 1], data[index + 2], 1.f };
     surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
 }
 
 template <class T>
 __global__ void mapPredRadianceToScreen2(T* __restrict__ data, cudaSurfaceObject_t output,
-    unsigned int width, unsigned int height) {
-    unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
+    uint32_t width, uint32_t height) {
+    uint32_t x = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x < width && y < height) {
-        unsigned int index = (y * width + x) * 3;
+        uint32_t index = (y * width + x) * 3;
         float4 radiance = { data[index + 0], data[index + 1], data[index + 2], 1.f };
     
-//         float greyScale = ((float)x / width) * ((float)y / height);
+//        float greyScale = ((float)x / width) * ((float)y / height);
 //        float4 radiance = { greyScale, greyScale, greyScale, 1.f };
         surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
     }
@@ -198,10 +198,10 @@ namespace NRC {
     }
 
     void NRCNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,
-        unsigned int width, unsigned int height)
+        uint32_t width, uint32_t height)
     {
 
-        unsigned int n_elements = width * height;
+        uint32_t n_elements = width * height;
         //int n_batches = div_round_up(n_elements, batch_size);
         //int n_queries = next_multiple(n_elements, 256u);
         
@@ -226,20 +226,30 @@ namespace NRC {
         RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss)
     {
         // self query
+
         linear_kernel(generateBatchSequential<input_dim>, 0, training_stream, self_query_batch_size,
             0, self_queries, mMemory->training_self_query->data());
-
         mNetwork->network->inference(training_stream, *mMemory->training_self_query, *mMemory->training_self_pred);
 
+        // get sample count...
+        // TODO: this costs ~1.5ms. find a better strategy.
+        uint32_t sample_count;
+        cudaMemcpy(&sample_count, training_sample_counter, sizeof(float), cudaMemcpyDeviceToHost);
+
         // training
-        linear_kernel(generateTrainingDataFromSamples<float>, 0, training_stream, batch_size,
-            0, training_samples, mMemory->training_self_pred->data(),
-            mMemory->training_data->data(), mMemory->training_target->data(),
-            training_sample_counter, self_query_counter);
-        linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_data->n_elements(), mMemory->training_data->data());
-        linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_target->n_elements(), mMemory->training_target->data());
-        mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
+        for (uint32_t i = 0; i + batch_size <= sample_count; i += batch_size) {
+            linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
+                i, training_samples, mMemory->training_self_pred->data(),
+                mMemory->training_data->data(), mMemory->training_target->data(),
+                training_sample_counter);
+
+            // not here: we check NaNs and INFs in the shader before adding the training samples.
+            //linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_data->n_elements(), mMemory->training_data->data());
+            //linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_target->n_elements(), mMemory->training_target->data());
+
+            mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
+            std::cout << "Loss at current step: " << loss << std::endl;
+        }
         cudaStreamSynchronize(training_stream);
-        std::cout << "Loss at current step: " << loss << std::endl;
     }
 }
