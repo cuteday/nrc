@@ -375,7 +375,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     for (uint depth = 0; depth < kMaxInferenceIter; depth++)
     {
         {   // do a training sample snapshot here
-            pathRecords[path.length] = generatePathVertexRecord(path);
+            pathRecords[path.length] = generatePathVertexRecord(path, sd);
             // calculate and update ray footprint for termination heuristic
             inferenceRayFootprint.nextBounce(path.origin, sd.posW, path.pdf, sd.NdotV);
         }
@@ -440,7 +440,8 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         float3 scatterOrigin = path.origin;
         float3 throughput = normalTerminate ? path.thp : float3(0);       // the path throughput is updated in generate scatter ray.
         float3 bias = path.L;               // the L already contains the self emission at the hit vertex
-        writeScreenInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
+        //writeScreenInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
+        writeScreenInferenceQuery(sd, throughput, bias);
     }
 
     const float3 queryRadiance = path.L;
@@ -460,7 +461,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         for(uint depth = 0; depth < kMaxTrainingSuffixIter; depth++)
         {
             {   // do a training sample snapshot here
-                pathRecords[path.length] = generatePathVertexRecord(path);
+                pathRecords[path.length] = generatePathVertexRecord(path, sd);
                 suffixRayFootprint.nextBounce(path.origin, sd.posW, path.pdf, sd.NdotV);
             }
             uint lobes = pt.standardMaterial.getBSDFLobes(sd);
@@ -521,7 +522,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     logSuffixPathLength(path.length - inferencePathLength);
     int queryIndex = -1;
     if (needsQuery) {
-        queryIndex = (int)addTrainingQuery(path.origin, -path.dir);
+        queryIndex = (int)addTrainingQuery(sd);
     }
     print("current query index: ", queryIndex);
 
@@ -537,6 +538,6 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
 
 float3 visualizeNRC(ShadingData sd){
     //float3 primaryRayDir = -sd.fromLocal(sd.V);
-    writeScreenInferenceQuery(sd.posW, sd.fromLocal(sd.V), float3(1.0), float3(0.0));
+    writeScreenInferenceQuery(sd, float3(1.0), float3(0.0));
     return float3(0);
 }

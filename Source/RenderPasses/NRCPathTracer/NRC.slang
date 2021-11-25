@@ -61,9 +61,11 @@ void NRCSetPixel(uint2 pixel)
 struct RadianceQuery
 {   // 32byte
     float3 pos;
-    float _pad0;
+    float roughness;
     float2 dir;
-    float2 _pad1;
+    float2 norm;
+    float4 diffuse;
+    float4 specular;
 };
 
 struct RadianceSample
@@ -95,6 +97,7 @@ RWTexture2D<float4> gScreenQueryFactor;
 RWTexture2D<float4> gScreenQueryBias;
 RWTexture2D<float4> gOutputResult;
 
+// map and normalize the world coord to [-1, 1]
 float3 normalizeCoord(float3 x)
 {
     //return x;
@@ -143,20 +146,28 @@ bool isTrainingPathRR()
     return false;
 }
 
-PathVertexRecord generatePathVertexRecord(PathData path)
+RadianceQuery generateQuery(ShadingData sd)
 {
     RadianceQuery query = { };
-    query.pos = normalizeCoord(path.origin);
-    query.dir = world_to_latlong_map(-path.dir);
+    query.pos = normalizeCoord(sd.posW);
+    query.dir = world_to_latlong_map(sd.V);
+    query.norm = world_to_latlong_map(sd.faceN);    // TODO: reverse the normal if the primitive is seen on the back-face side.
+    query.diffuse = float4(sd.diffuse, 0);
+    query.specular = float4(sd.specular, 0);
+    query.roughness = sd.linearRoughness;
+    return query;
+}
+
+PathVertexRecord generatePathVertexRecord(PathData path, ShadingData sd)
+{
+    RadianceQuery query = generateQuery(sd);
     PathVertexRecord record = { query, path.thp, path.L };
     return record;
 }
 
-void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bias)
+void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
 {
-    RadianceQuery query = { };
-    query.pos = normalizeCoord(pos);
-    query.dir = world_to_latlong_map(dir);
+    RadianceQuery query = generateQuery(sd);
     uint2 frameDim = gNRCScreenSize;
     int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
     gScreenQueryFactor[gNRCPixel] = float4(factor, 0);
@@ -164,12 +175,20 @@ void writeScreenInferenceQuery(float3 pos, float3 dir, float3 factor, float3 bia
     gInferenceRadianceQuery[index] = query;
 }
 
-uint addTrainingQuery(float3 pos, float3 dir)
+/*uint addTrainingQuery(float3 pos, float3 dir)
 {
     uint idx = gTrainingRadianceQuery.IncrementCounter();
     RadianceQuery query = { };
     query.pos = normalizeCoord(pos);
     query.dir = world_to_latlong_map(dir);
+    gTrainingRadianceQuery[idx] = query;
+    return idx;
+}*/
+
+uint addTrainingQuery(ShadingData sd)
+{
+    uint idx = gTrainingRadianceQuery.IncrementCounter();
+    RadianceQuery query = generateQuery(sd);
     gTrainingRadianceQuery[idx] = query;
     return idx;
 }

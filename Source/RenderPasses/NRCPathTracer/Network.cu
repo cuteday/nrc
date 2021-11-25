@@ -20,6 +20,7 @@ namespace {
     // 4 steps each frame, with 16384 samples per batch
     uint32_t resolution = 1920 * 1080;    // is a multiple of 256
     const uint32_t batch_size = 1 << 14;
+    const uint32_t n_train_batch = 4;
     const uint32_t self_query_batch_size = 1 << 16;     // ~ 57600
     const uint32_t input_dim = 5;         // pos, dir
     const uint32_t output_dim = 3;        // RGB
@@ -29,6 +30,7 @@ namespace {
     // cuda related
     cudaStream_t inference_stream;
     cudaStream_t training_stream;
+    curandGenerator_t rng;
 
     struct _Network { 
         std::shared_ptr<Loss<precision_t>> loss = nullptr;
@@ -48,6 +50,8 @@ namespace {
         GPUMatrix* inference_target = nullptr;
         GPUMatrix* training_self_query = nullptr;
         GPUMatrix* training_self_pred = nullptr;
+
+        GPUMemory<float>* random_seq = nullptr;
     };
 
     _Memory* mMemory;
@@ -88,10 +92,13 @@ template <uint32_t stride = 5, typename T = float>
 __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
     NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
     T* __restrict__ training_data, T* __restrict__ training_target,
-    uint32_t* training_sample_counter) {
+    uint32_t* training_sample_counter, float* __restrict__ random_indices = nullptr) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
-    int data_index = stride * 5, sample_index = i + offset;
+    int data_index = i * stride, sample_index = i + offset;
+    if (random_indices) {
+        sample_index = (1 - random_indices[sample_index]) * *training_sample_counter;
+    }
     int pred_index = samples[sample_index].idx; // pred_index == -1 if a self-query is not needed.
 
     if (sample_index < *training_sample_counter) {
@@ -113,6 +120,8 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
         training_target[output_index + 2] = (T)radiance.z;
     }
 }
+
+
 
 template <typename T = float>
 __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
@@ -153,6 +162,11 @@ namespace NRC {
     {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
         CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
+        //training_stream = inference_stream;
+
+        CURAND_CHECK_THROW(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT));
+        CURAND_CHECK_THROW(curandSetPseudoRandomGeneratorSeed(rng, 7272ULL));
+        CURAND_CHECK_THROW(curandSetStream(rng, training_stream));
 
         initializeNetwork();
     }
@@ -188,6 +202,9 @@ namespace NRC {
         mMemory->inference_target = new GPUMatrix(output_dim, resolution);
         mMemory->training_self_query = new GPUMatrix(input_dim, self_query_batch_size);
         mMemory->training_self_pred = new GPUMatrix(output_dim, self_query_batch_size);
+
+        mMemory->random_seq = new GPUMemory<float>(n_train_batch * batch_size);
+        CURAND_CHECK_THROW(curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size));
     }
 
     void NRCNetwork::reset()
@@ -202,9 +219,6 @@ namespace NRC {
     {
 
         uint32_t n_elements = width * height;
-        //int n_batches = div_round_up(n_elements, batch_size);
-        //int n_queries = next_multiple(n_elements, 256u);
-        
         //std::cout << "Inference batch size: " << mMemory->inference_data->rows() << mMemory->inference_data->cols() << std::endl;
 
         // this input generation process takes about ~1ms.
@@ -212,7 +226,6 @@ namespace NRC {
             0, queries, mMemory->inference_data->data());
         
         mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
-
         //linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
 
         dim3 dimBlock(16, 16), dimGrid(div_round_up(width, 16u), div_round_up(height, 16u));
@@ -226,17 +239,26 @@ namespace NRC {
         RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss)
     {
         // self query
-
         linear_kernel(generateBatchSequential<input_dim>, 0, training_stream, self_query_batch_size,
             0, self_queries, mMemory->training_self_query->data());
         mNetwork->network->inference(training_stream, *mMemory->training_self_query, *mMemory->training_self_pred);
 
+        // training
+#if 1   // randomly select 4 training batches over all samples
+        //CURAND_CHECK_THROW(curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size));
+        for (uint32_t i = 0; i < n_train_batch; i++) {
+            linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
+                i * batch_size, training_samples, mMemory->training_self_pred->data(),
+                mMemory->training_data->data(), mMemory->training_target->data(),
+                training_sample_counter, mMemory->random_seq->data());
+            mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
+        }
+#elif 0   // batched training over all samples
         // get sample count...
         // TODO: this costs ~1.5ms. find a better strategy.
         uint32_t sample_count;
         cudaMemcpy(&sample_count, training_sample_counter, sizeof(float), cudaMemcpyDeviceToHost);
 
-        // training
         for (uint32_t i = 0; i + batch_size <= sample_count; i += batch_size) {
             linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
                 i, training_samples, mMemory->training_self_pred->data(),
@@ -250,6 +272,18 @@ namespace NRC {
             mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
             std::cout << "Loss at current step: " << loss << std::endl;
         }
+#elif 0 // single batched training
+        linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
+            0, training_samples, mMemory->training_self_pred->data(),
+            mMemory->training_data->data(), mMemory->training_target->data(),
+            training_sample_counter);
+
+        linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_data->n_elements(), mMemory->training_data->data());
+        linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_target->n_elements(), mMemory->training_target->data());
+
+        mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
+        std::cout << "Loss at current step: " << loss << std::endl;
+#endif
         cudaStreamSynchronize(training_stream);
     }
 }
