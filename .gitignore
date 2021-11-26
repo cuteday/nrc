@@ -21,3 +21,4 @@ Tests/data
 *.log
 Build/
 Source/tiny-cuda-nn/
+Outputs/

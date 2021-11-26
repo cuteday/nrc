@@ -151,7 +151,8 @@ RadianceQuery generateQuery(ShadingData sd)
     RadianceQuery query = { };
     query.pos = normalizeCoord(sd.posW);
     query.dir = world_to_latlong_map(sd.V);
-    query.normal = world_to_latlong_map(sd.faceN);    // TODO: reverse the normal if the primitive is seen on the back-face side.
+    float3 faceN = sd.frontFacing ? sd.faceN : -sd.faceN; 
+    query.normal = world_to_latlong_map(faceN);    // reverse the normal if the primitive is seen on the back-face side.
     query.diffuse = float4(sd.diffuse, 0);
     query.specular = float4(sd.specular, 0);
     query.roughness = sd.linearRoughness;

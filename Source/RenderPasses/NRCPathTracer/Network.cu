@@ -106,7 +106,8 @@ template <uint32_t stride, typename T = float>
 __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
     NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
     T* __restrict__ training_data, T* __restrict__ training_target,
-    uint32_t* training_sample_counter, float* __restrict__ random_indices = nullptr) {
+    uint32_t* training_sample_counter, uint32_t* self_query_counter, 
+    float* __restrict__ random_indices = nullptr) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
     int data_index = i * stride, sample_index = i + offset;
@@ -262,7 +263,7 @@ namespace NRC {
             linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
                 i * batch_size, training_samples, mMemory->training_self_pred->data(),
                 mMemory->training_data->data(), mMemory->training_target->data(),
-                training_sample_counter, mMemory->random_seq->data());
+                training_sample_counter, self_query_counter, mMemory->random_seq->data());
             mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
         }
 #elif 0   // batched training over all samples
@@ -275,7 +276,7 @@ namespace NRC {
             linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
                 i, training_samples, mMemory->training_self_pred->data(),
                 mMemory->training_data->data(), mMemory->training_target->data(),
-                training_sample_counter);
+                training_sample_counter, self_query_counter);
 
             // not here: we check NaNs and INFs in the shader before adding the training samples.
             //linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_data->n_elements(), mMemory->training_data->data());
@@ -288,7 +289,7 @@ namespace NRC {
         linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
             0, training_samples, mMemory->training_self_pred->data(),
             mMemory->training_data->data(), mMemory->training_target->data(),
-            training_sample_counter);
+            training_sample_counter, self_query_counter);
 
         linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_data->n_elements(), mMemory->training_data->data());
         linear_kernel(chkNaN<float>, 0, training_stream, mMemory->training_target->n_elements(), mMemory->training_target->data());
