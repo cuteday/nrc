@@ -30,8 +30,6 @@ def render_graph_PathTracerGraph():
     g.addEdge("NRCPathTracer.result", "NRCToneMapped.src")
     g.markOutput("ToneMapped.dst")
     g.markOutput("NRCToneMapped.dst")
-    g.markOutput("NRCPathTracer.result")
-    g.markOutput("NRCPathTracer.factor")
     return g
 
 PathTracerGraph = render_graph_PathTracerGraph()

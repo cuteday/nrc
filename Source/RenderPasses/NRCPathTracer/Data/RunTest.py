@@ -54,11 +54,12 @@ m.loadScene('../../../Media/Arcade/Arcade.pyscene', buildFlags=SceneBuilderFlags
 # for i in range(10):
 # 	renderFrame()
 # 	m.frameCapture.baseFilename = f"arcade_nrc_{i:04d}"
+#   m.frameCapture.capture()
 # exit()
 
-# m.videoCapture.outputDir = '../../../Outputs/Video'
-# m.videoCapture.ui = False
-# m.videoCapture.baseFilename = 'arcade_nrc'
-# m.videoCapture.codec = Codec.Raw
-# m.videoCapture.fps = 24
-# m.videoCapture.addRanges(m.activeGraph, [[0, 300]])
+m.videoCapture.outputDir = '../../../Outputs/Video'
+m.videoCapture.ui = False
+m.videoCapture.baseFilename = 'arcade_nrc'
+m.videoCapture.codec = Codec.Raw
+m.videoCapture.fps = 24
+m.videoCapture.addRanges(m.activeGraph, [[0, 300]])

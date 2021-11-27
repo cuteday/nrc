@@ -60,7 +60,8 @@ private:
         NRC::NRCInterface::SharedPtr pNRC = nullptr;
 
         bool enableNRC = true;
-        bool visualizeMode = false;
+        bool visualizeNRC = false;
+        bool visualizeFactor = false;
         float prob_rr_suffix_absorption = 0.2f;
         float terminate_footprint_thres = 50.f;
         int max_training_bounces = 5;               // max path segments for training suffix
