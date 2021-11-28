@@ -21,4 +21,6 @@ Tests/data
 *.log
 Build/
 Source/tiny-cuda-nn/
-Outputs/
+Outputs/Metrics
+Outputs/Image
+Outputs/Video
