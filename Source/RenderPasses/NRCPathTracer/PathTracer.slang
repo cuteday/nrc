@@ -377,7 +377,6 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         {   // do a training sample snapshot here
             pathRecords[path.length] = generatePathVertexRecord(path, sd);
             // calculate and update ray footprint for termination heuristic
-            inferenceRayFootprint.nextBounce(path.origin, sd.posW, path.pdf, sd.NdotV);
         }
 
         uint lobes = pt.standardMaterial.getBSDFLobes(sd);
@@ -419,7 +418,20 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         if (validHit)
         {   // Handle current intersection, update path data & shading data for next scatter. Here the emissive radiance is added to path contribution.
             // also the length of the path is increased here
+            // [NOTE] that the path origin and the sd.posW is simultaneously updated here, but they slightly differences since the hit pos is slightly offseted on the surface.
+            float3 prevPos = sd.posW;   // save the previous ray origin before it updates.
             handleHit(pt, sd, path);
+            // update ray footprint information
+            inferenceRayFootprint = inferenceRayFootprint.nextBounce(prevPos, sd.posW, path.pdf, sd.NdotV);
+/*            {
+                // ray footprint heuristic debugging... 
+                print("At path depth: ", path.length);
+                print("Path pdf: ", path.pdf);
+                print("NdotV: ", sd.NdotV);
+                print("Ray spread: ", inferenceRayFootprint.spread);
+                print("Path origin: ", prevPos);
+                print("Path intersection: ", sd.posW);
+            }*/
         }
         else
         {   // add MIS weighted contribution from environment map.
@@ -491,7 +503,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
             if (path.isTransmission()) path.origin = path.transmissionOrigin;
 
             const bool isLastVertex = (needsQuery && suffixRayFootprint.terminate())
-                || path.length == kMaxTrainingSuffixIter - 1
+                || path.length - inferencePathLength >= kMaxTrainingSuffixIter - 1
                 || path.nonSpecularBounces > kMaxNonSpecularBounces;
 
             // this "if" means we only takes the contribution from light sources into account.  [kUseMIS is enabled by default so ignore this]
@@ -506,8 +518,19 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
             if (validHit)
             {   // Handle current intersection, update path data & shading data for next scatter. Here the emissive radiance is added to path contribution.
                 // path length is increased here
+                float3 prevPos = sd.posW;
                 handleHit(pt, sd, path);
-            }
+                suffixRayFootprint = suffixRayFootprint.nextBounce(prevPos, sd.posW, path.pdf, sd.NdotV);
+                {
+                    // ray footprint heuristic debugging... 
+                    print("At suffix path depth: ", path.length);
+                    print("Path origin: ", prevPos);
+                    print("Path intersection: ", sd.posW);
+                    print("Path pdf: ", path.pdf);
+                    print("NdotV: ", sd.NdotV);
+                    print("Ray spread: ", suffixRayFootprint.spread);
+                }
+}
             else
             {   // add MIS weighted contribution from environment map.
                 lastScatterMissed = true;
@@ -516,6 +539,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
             }
 
             if (!validHit) break;
+            if (isLastVertex) break;
         }
     }
 

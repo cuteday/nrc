@@ -14,8 +14,6 @@ using precision_t = tcnn::network_precision_t;
 #define AUX_INPUTS
 
 #define GPUMatrix GPUMatrix<float, CM>
-//typedef tcnn::GPUMatrix<float, RM> GPUMatrix;
-//using GPUMatrix = tcnn::GPUMatrix<float, RM>
 
 namespace {
 
@@ -79,19 +77,13 @@ template <typename T>
 __device__ void copyQuery(T* data, const NRC::RadianceQuery* query) {
     // use naive copy kernel since memcpy has bad performance on small datas.
     
-    //*(float3*)&data[0] = query->pos;
-    //*(float2*)&data[3] = query->dir;
     data[0] = query->pos.x, data[1] = query->pos.y, data[2] = query->pos.z;
     data[3] = query->dir.x, data[4] = query->dir.y;
 #ifdef AUX_INPUTS
     data[5] = query->roughness;
     data[6] = query->normal.x, data[7] = query->normal.y;
     data[8] = query->diffuse.x, data[9] = query->diffuse.y, data[10] = query->diffuse.z;
-    data[11] = query->specular.x, data[12] = query->specular.y, data[12] = query->specular.z;
-    //*(float2*)&data[5] = query->normal;
-    //data[7] = query->roughness;
-    //*(float3*)&data[8] = *(float3*)&query->diffuse;
-    //*(float3*)&data[11] = *(float3*)&query->specular;
+    data[11] = query->specular.x, data[12] = query->specular.y, data[13] = query->specular.z;
 #endif
 }
 

@@ -38,11 +38,13 @@ enum NRCPathType
 struct NRCRayFootprint{
     float spread;
 
+    // the ray bounces from U to V.
     NRCRayFootprint nextBounce(float3 u, float3 v, float pdf, float NdotV)
     { 
         NdotV = max(NdotV, 0.01);
         float current = distance(u, v) / pdf / NdotV;
         if (pdf == 0) current = 0;      // sampled using a delta func.
+        //this.spread += current;
         return { spread + current };
     }
 

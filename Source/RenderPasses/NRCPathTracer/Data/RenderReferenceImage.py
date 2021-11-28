@@ -29,7 +29,6 @@ def render_graph_PathTracerGraph():
     g.markOutput("ToneMappingPass.dst")
     return g
 
-
 PathTracerGraph = render_graph_PathTracerGraph()
 try: m.addGraph(PathTracerGraph)
 except NameError: None

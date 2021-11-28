@@ -51,6 +51,8 @@ namespace Falcor
                 mpStatsInferencePathLength = Texture::create2D(frameDim.x, frameDim.y, ResourceFormat::R32Uint, 1, 1, nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
                 mpStatsSuffixPathLength = Texture::create2D(frameDim.x, frameDim.y, ResourceFormat::R32Uint, 1, 1, nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
             }
+            //pRenderContext->clearTexture(mpStatsInferencePathLength.get(), uint4(0));
+            //pRenderContext->clearTexture(mpStatsSuffixPathLength.get(), uint4(0));
             pRenderContext->clearUAV(mpStatsSuffixPathLength->getUAV().get(), uint4(0));
             pRenderContext->clearUAV(mpStatsInferencePathLength->getUAV().get(), uint4(0));
         }
