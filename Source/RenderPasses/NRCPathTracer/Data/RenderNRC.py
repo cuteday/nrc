@@ -33,7 +33,7 @@ PathTracerGraph = render_graph_PathTracerGraph()
 try: m.addGraph(PathTracerGraph)
 except NameError: None
 
-
+param_n_train_frames = 2048
 param_n_accumulate_frames = 256
 param_n_video_frames = 60
 param_n_image_frames = 50
@@ -44,6 +44,13 @@ param_base_filename = "zeroday_nrc"
 # m.loadScene('../../../Media/Arcade/Arcade.pyscene', buildFlags=SceneBuilderFlags.Default)
 # m.loadScene('../../../Media/ORCA/ZeroDay_v1/MEASURE_ONE/zeroday.pyscene', buildFlags=SceneBuilderFlags.Default)
 m.loadScene('../../../Media/ORCA/ZeroDay_v1/MEASURE_SEVEN/zeroday_colored.pyscene', buildFlags=SceneBuilderFlags.Default)
+
+########################################################################################
+# We firstly give the NRC a warm-up, that is, train the network for about ~10s,
+# after it converges, run the inference at given viewpoints.
+########################################################################################
+for _ in range(param_n_train_frames):
+    m.renderFrame()
 
 # configures clock and framerate so the timepoint of the frames we rendered are deterministic
 

@@ -30,7 +30,7 @@ namespace
         { kColorOutput,     "gOutputColor",               "Output color (linear) with contribution from NRC excluded", true /* optional */                              },
         { kAlbedoOutput,    "gOutputAlbedo",              "Surface albedo (base color) or background color", true /* optional */    },
         { kTimeOutput,      "gOutputTime",                "Per-pixel execution time", true /* optional */, ResourceFormat::R32Uint  },
-        { kNRCResultOutput, "gOutputResult",              "NRC predicted radiance composited with outputColor", false                }
+        { kNRCResultOutput, "gOutputResult",              "NRC predicted radiance composited with outputColor", true                }
     };
 };
 
