@@ -66,8 +66,10 @@ struct RadianceQuery
     float roughness;
     float2 dir;
     float2 normal;
-    float4 diffuse;
-    float4 specular;
+    float3 diffuse;
+    float _pad0;
+    float3 specular;
+    float _pad1;
 };
 
 struct RadianceSample
@@ -155,8 +157,10 @@ RadianceQuery generateQuery(ShadingData sd)
     query.dir = world_to_latlong_map(sd.V);
     float3 faceN = sd.frontFacing ? sd.faceN : -sd.faceN; 
     query.normal = world_to_latlong_map(faceN);    // reverse the normal if the primitive is seen on the back-face side.
-    query.diffuse = float4(sd.diffuse, 0);
-    query.specular = float4(sd.specular, 0);
+    /*    query.diffuse = float4(sd.diffuse, 1);
+        query.specular = float4(sd.specular, 1);*/
+    query.diffuse = sd.diffuse;
+    query.specular = sd.specular;
     query.roughness = sd.linearRoughness;
     return query;
 }

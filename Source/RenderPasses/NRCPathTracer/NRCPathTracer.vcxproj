@@ -31,6 +31,7 @@
   <ItemGroup>
     <ClInclude Include="Debug\NRCPixelStats.h" />
     <ClInclude Include="FalcorCUDA.h" />
+    <ClInclude Include="Helpers.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="NRC.h" />
     <ClInclude Include="NRCPathTracer.h" />

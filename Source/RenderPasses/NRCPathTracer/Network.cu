@@ -3,6 +3,7 @@
 #endif
 
 #include "Network.h"
+#include "Helpers.h"
 
 #include <tiny-cuda-nn/misc_kernels.h>
 #include <tiny-cuda-nn/config.h>
@@ -12,6 +13,7 @@ using namespace tcnn;
 using precision_t = tcnn::network_precision_t;
 
 #define AUX_INPUTS
+#define REFLECTANCE_FACT
 
 #define GPUMatrix GPUMatrix<float, CM>
 
@@ -54,23 +56,11 @@ namespace {
         GPUMatrix* inference_target = nullptr;
         GPUMatrix* training_self_query = nullptr;
         GPUMatrix* training_self_pred = nullptr;
-
         GPUMemory<float>* random_seq = nullptr;
     };
 
     _Memory* mMemory;
     _Network* mNetwork;
-}
-
-// device code helper functions
-template <typename T = float3>
-__device__ T vec3_mult(T a, T b) {
-    return { a.x * b.x, a.y * b.y, a.z * b.z };
-}
-
-template <typename T = float3>
-__device__ T vec3_add(T a, T b) {
-    return { a.x + b.x, a.y + b.y, a.z + b.z };
 }
 
 template <typename T>
@@ -93,7 +83,7 @@ __device__ void copyQuery(T* data, const NRC::RadianceQuery* query) {
 // stride: input dim
 template <uint32_t stride, typename T = float>
 __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset, 
-    NRC::RadianceQuery* __restrict__ queries, T* __restrict__ data) {
+    NRC::RadianceQuery* queries, T* data) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset < n_elements) {
         uint32_t data_index = i * stride, query_index = i + offset;
@@ -104,16 +94,15 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
 
 template <uint32_t stride, typename T = float>
 __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
-    NRC::RadianceSample* __restrict__ samples, T* __restrict__ self_query_pred,
-    T* __restrict__ training_data, T* __restrict__ training_target,
-    uint32_t* training_sample_counter, uint32_t* self_query_counter, 
-    float* __restrict__ random_indices = nullptr) {
+    NRC::RadianceSample* samples, NRC::RadianceQuery* self_queries, T* self_query_pred,
+    T* training_data, T* training_target, uint32_t* training_sample_counter, uint32_t* self_query_counter, 
+    float* random_indices = nullptr) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
     int data_index = i * stride, sample_index = i + offset;
-    if (random_indices) {
+    if (random_indices) 
         sample_index = (1 - random_indices[sample_index]) * *training_sample_counter;
-    }
+
     int pred_index = samples[sample_index].idx; // pred_index == -1 if a self-query is not needed.
 
     if (sample_index < *training_sample_counter) {
@@ -122,44 +111,56 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
 
         copyQuery(&training_data[data_index], &samples[sample_index].query);
 
-        float3 pred_radiance = { };
+        float3 pred_radiance = { 0, 0, 0 };
         if (pred_index >= 0)    // else the sample doesn't contain a self query.
-            pred_radiance = { self_query_pred[pred_index], self_query_pred[pred_index + 1], self_query_pred[pred_index + 2] };
-        float3 radiance = vec3_add(vec3_mult(pred_radiance, factor), bias);
-
+            pred_radiance = { self_query_pred[pred_index * 3], self_query_pred[pred_index * 3 + 1], self_query_pred[pred_index * 3 + 2] };
+#ifdef REFLECTANCE_FACT
+        float3 reflectance = samples[sample_index].query.diffuse + samples[sample_index].query.specular;
+        if (pred_index >= 0)
+            pred_radiance = pred_radiance * (self_queries[pred_index].diffuse + self_queries[pred_index].specular); 
+        float3 radiance = safe_div(pred_radiance * factor + bias, reflectance);
+#else
+        float3 radiance = pred_radiance * factor + bias;
+#endif
         *(float3*)&training_target[output_index] = radiance;
     }
 }
 
-
-
 template <typename T = float>
 __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
-    T* __restrict__ data, cudaSurfaceObject_t output) {
+    NRC::RadianceQuery* queries, T* data, cudaSurfaceObject_t output) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t x = i % width, y = i / width;
     uint32_t index = i * 3;
-    float4 radiance = { data[index + 0] , data[index + 1], data[index + 2], 1.f };
-    surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
+    float3 radiance = { data[index + 0] , data[index + 1], data[index + 2] };
+
+#ifdef REFLECTANCE_FACT
+    radiance = radiance * (queries[i].diffuse + queries[i].specular);
+#endif
+    float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
+    surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
 }
 
 template <class T>
-__global__ void mapPredRadianceToScreen2(T* __restrict__ data, cudaSurfaceObject_t output,
+__global__ void mapPredRadianceToScreen2(NRC::RadianceQuery* queries, T* data, cudaSurfaceObject_t output,
     uint32_t width, uint32_t height) {
     uint32_t x = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x < width && y < height) {
-        uint32_t index = (y * width + x) * 3;
-        float4 radiance = { data[index + 0], data[index + 1], data[index + 2], 1.f };
-    
-//        float greyScale = ((float)x / width) * ((float)y / height);
-//        float4 radiance = { greyScale, greyScale, greyScale, 1.f };
-        surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
+        uint32_t index = y * width + x;
+        uint32_t data_index = index * 3;
+        float3 radiance = { data[data_index + 0], data[data_index + 1], data[data_index + 2]};
+
+#ifdef REFLECTANCE_FACT
+        radiance = radiance * (queries[index].diffuse + queries[index].specular);
+#endif
+        float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
+        surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
     }
 }
 
 template <typename T = float>
-__global__ void chkNaN(uint32_t n_elements, T* __restrict__ data) {
+__global__ void chkNaN(uint32_t n_elements, T* data) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i > n_elements) return;
     if (isnan(data[i]) || isinf(data[i])) {
@@ -231,7 +232,6 @@ namespace NRC {
     void NRCNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,
         uint32_t width, uint32_t height)
     {
-
         uint32_t n_elements = width * height;
 
         // this input generation process takes about ~1ms.
@@ -239,11 +239,11 @@ namespace NRC {
             0, queries, mMemory->inference_data->data());
         
         mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
-        //linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
+        //linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, queries, mMemory->inference_target->data(), output);
 
         dim3 dimBlock(16, 16), dimGrid(div_round_up(width, 16u), div_round_up(height, 16u));
         mapPredRadianceToScreen2<float> <<<dimGrid, dimBlock, 0, inference_stream >>>
-            (mMemory->inference_target->data(), output, width, height);
+            (queries, mMemory->inference_target->data(), output, width, height);
 
         cudaStreamSynchronize(inference_stream);
     }
@@ -261,7 +261,7 @@ namespace NRC {
         //CURAND_CHECK_THROW(curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size));
         for (uint32_t i = 0; i < n_train_batch; i++) {
             linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
-                i * batch_size, training_samples, mMemory->training_self_pred->data(),
+                i * batch_size, training_samples, self_queries, mMemory->training_self_pred->data(),
                 mMemory->training_data->data(), mMemory->training_target->data(),
                 training_sample_counter, self_query_counter, mMemory->random_seq->data());
             mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);

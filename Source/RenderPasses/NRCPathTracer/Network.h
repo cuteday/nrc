@@ -19,8 +19,10 @@ namespace NRC {
         float roughness;// 
         float2 dir;     // the oneblob encoding needs inputs to be mapped in [0, 1]
         float2 normal;  // 
-        float4 diffuse; // these parameters are passed through, since they preserve linearity    
-        float4 specular;
+        float3 diffuse; // these parameters are passed through, since they preserve linearity    
+        float _pad0;
+        float3 specular;
+        float _pad1;
     };
 
     struct RadianceSample
@@ -46,7 +48,7 @@ namespace NRC {
         void initializeNetwork();
         void reset();
 
-        __host__ void inference(RadianceQuery* queries, cudaSurfaceObject_t output, unsigned int width, unsigned int height);
+        __host__ void inference(RadianceQuery* queries, cudaSurfaceObject_t output, uint32_t width, uint32_t height);
         __host__ void train(RadianceQuery* self_queries, uint32_t* self_query_counter,
             RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss);
 

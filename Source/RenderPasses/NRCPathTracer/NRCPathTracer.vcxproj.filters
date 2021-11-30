@@ -29,6 +29,9 @@
     <ClInclude Include="Parameters.h">
       <Filter>NN</Filter>
     </ClInclude>
+    <ClInclude Include="Helpers.h">
+      <Filter>NN</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ShaderSource Include="PathTracer.rt.slang" />
