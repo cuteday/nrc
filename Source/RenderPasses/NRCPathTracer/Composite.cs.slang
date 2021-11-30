@@ -6,19 +6,20 @@ cbuffer CompositeCB {
 Texture2D<float4> bias;
 Texture2D<float4> factor;
 Texture2D<float4> radiance;
-Texture2D<float4> diffuse;
-Texture2D<float4> specular;
+Texture2D<float4> reflectance;
+/*Texture2D<float4> diffuse;
+Texture2D<float4> specular;*/
 RWTexture2D<float4> output;
 
 [numthreads(16, 16, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID){
     const uint2 pixel = dispatchThreadId.xy;
     float4 result = bias[pixel];
-    float4 reflectance = float4(diffuse[pixel].xyz + specular[pixel].xyz, 1);
+    // float4 reflectance = float4(diffuse[pixel].xyz + specular[pixel].xyz, 1);
     // factor == 0 means we don't need to query the network.
     if (any(factor[pixel])) {
-        result += factor[pixel] * radiance[pixel];
-        if (gReflectanceFact) result *= reflectance;
+        float4 defact = gReflectanceFact ? reflectance[pixel] : float4(1);
+        result += factor[pixel] * radiance[pixel] * defact;
     }
     output[pixel] = result;
     if (gVisualizeMode > 1 && any(factor[pixel]))
@@ -30,6 +31,6 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID){
         else if (gVisualizeMode == 4)
             output[pixel] = bias[pixel];
         else if (gVisualizeMode == 5)
-            output[pixel] = reflectance;
+            output[pixel] = reflectance[pixel];
     }
 }

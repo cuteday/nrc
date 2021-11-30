@@ -115,6 +115,7 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
 #if REFLECTANCE_FACT
         float3 reflectance = samples[sample_index].query.diffuse + samples[sample_index].query.specular;
         if (pred_index >= 0)
+            // restore self-query from reflectance factorization...
             pred_radiance = pred_radiance * (self_queries[pred_index].diffuse + self_queries[pred_index].specular); 
         float3 radiance = safe_div(pred_radiance * factor + bias, reflectance);
 #else

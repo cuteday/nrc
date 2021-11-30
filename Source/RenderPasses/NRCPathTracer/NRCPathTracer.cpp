@@ -110,8 +110,8 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mNRC.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
-        /*mNRC.pScreenQueryReflectance = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);*/
+        mNRC.pScreenQueryReflectance = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
 
         // also register these resource to NRCInterface again
         mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadiaceQuery, mNRC.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
@@ -385,16 +385,19 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     // set textures & buffers (defined in NrC.slang)
     pVars["gScreenQueryFactor"] = mNRC.pScreenQueryFactor;
     pVars["gScreenQueryBias"] = mNRC.pScreenQueryBias;
+    pVars["gScreenQueryReflectance"] = mNRC.pScreenQueryReflectance;
     pVars["gInferenceRadianceQuery"] = mNRC.pInferenceRadiaceQuery;
     pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
     pVars["gTrainingRadianceSample"] = mNRC.pTrainingRadianceSample;
+
 
     mCompositePass["CompositeCB"]["gVisualizeMode"] = mNRC.visualizeMode;
     mCompositePass["CompositeCB"]["gReflectanceFact"] = (bool)REFLECTANCE_FACT;
     mCompositePass["factor"] = mNRC.pScreenQueryFactor;
     mCompositePass["bias"] = mNRC.pScreenQueryBias;
     mCompositePass["radiance"] = mNRC.pScreenResult;
-    mCompositePass["diffuse"] = renderData["mtlDiffOpacity"]->asTexture();
-    mCompositePass["specular"] = renderData["mtlSpecRough"]->asTexture();
+    mCompositePass["reflectance"] = mNRC.pScreenQueryReflectance;
+    //mCompositePass["diffuse"] = renderData["mtlDiffOpacity"]->asTexture();
+    //mCompositePass["specular"] = renderData["mtlSpecRough"]->asTexture();
     mCompositePass["output"] = renderData[kNRCResultOutput]->asTexture();
 }

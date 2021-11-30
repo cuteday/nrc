@@ -9,7 +9,7 @@
 #define NRC_PARAMETERS
 
 #define AUX_INPUTS          1
-#define REFLECTANCE_FACT    0
+#define REFLECTANCE_FACT    1
 
 //extern class uint2;
 
