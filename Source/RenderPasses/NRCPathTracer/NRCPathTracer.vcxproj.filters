@@ -44,6 +44,7 @@
       <Filter>Debug</Filter>
     </ShaderSource>
     <ShaderSource Include="Composite.cs.slang" />
+    <ShaderSource Include="DataStructure.slang" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="NN">

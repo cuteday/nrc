@@ -2,6 +2,8 @@ import Scene.ShadingData;
 import Utils.Math.MathHelpers;
 import RenderPasses.Shared.PathTracer.PathData;
 
+import DataStructure;
+
 #ifndef NRC_MAX_TRAINING_BOUNCES
 #define NRC_MAX_TRAINING_BOUNCES 5
 #endif
@@ -60,28 +62,6 @@ void NRCSetPixel(uint2 pixel)
     gNRCPixel = pixel;
 }
 
-struct RadianceQuery
-{   // 32byte
-    float3 pos;
-    float roughness;
-    float2 dir;
-    float2 normal;
-    float3 diffuse;
-    float _pad0;
-    float3 specular;
-    float _pad1;
-};
-
-struct RadianceSample
-{   // 64byte
-    RadianceQuery query;
-    // L_o (scattered radiance) = a * L_i + b
-    int idx;    // which query it belongs to?
-    float3 a;   // factor of scatter ray (bsdf sample)
-    float3 b;   // the direct sample part
-    float _pad0;
-};
-
 struct PathVertexRecord
 {
     RadianceQuery query;
@@ -99,6 +79,7 @@ RWStructuredBuffer<RadianceSample> gTrainingRadianceSample;
 RWStructuredBuffer<RadianceQuery> gInferenceRadianceQuery;
 RWTexture2D<float4> gScreenQueryFactor;
 RWTexture2D<float4> gScreenQueryBias;
+RWTexture2D<float4> gScreenQueryReflectance;
 RWTexture2D<float4> gOutputResult;
 
 // map and normalize the world coord to [-1, 1]
@@ -179,6 +160,7 @@ void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
     int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
     gScreenQueryFactor[gNRCPixel] = float4(factor, 0);
     gScreenQueryBias[gNRCPixel] = float4(bias, 1);
+    gScreenQueryReflectance[gNRCPixel] = float4(sd.specular + sd.diffuse, 1);
     gInferenceRadianceQuery[index] = query;
 }
 

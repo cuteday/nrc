@@ -46,6 +46,8 @@
 
 #define BEGIN_NAMESPACE_FALCOR namespace Falcor{
 #define END_NAMESPACE_FALCOR }
+#define BEGIN_NAMESPACE_NRC namespace NRC{
+#define END_NAMESPACE_NRC }
 #define SETTER_DECL
 #define CONST_FUNCTION const
 
@@ -77,7 +79,9 @@ namespace Falcor
     template<typename T, typename F>
     const T bit_cast(const F& from) noexcept
     {
+#ifndef __NVCC__
         static_assert(sizeof(T) == sizeof(F));
+#endif
         T result;
         memcpy(&result, &from, sizeof(from));
         return result;
@@ -97,6 +101,8 @@ namespace Falcor
 #define SETTER_DECL [mutating]
 #define BEGIN_NAMESPACE_FALCOR
 #define END_NAMESPACE_FALCOR
+#define BEGIN_NAMESPACE_NRC
+#define END_NAMESPACE_NRC 
 #define CONST_FUNCTION
 
 #endif

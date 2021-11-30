@@ -6,6 +6,8 @@
 
 namespace
 {
+    using namespace NRC;
+
     const char kShaderFile[] = "RenderPasses/NRCPathTracer/PathTracer.rt.slang";
     const char kCompositeShaderFile[] = "RenderPasses/NRCPathTracer/Composite.cs.slang";
     const char kParameterBlockName[] = "gData";
@@ -24,6 +26,14 @@ namespace
     const std::string kTimeOutput = "time";
     const std::string kNRCResultOutput = "result";
     const std::string kNRCFactorOutput = "factor";
+
+    const Gui::DropdownList kNRCVisualizeModeList = {
+        {(uint32_t)NRCVisualizeMode::Result, "composited radiance"},
+        {(uint32_t)NRCVisualizeMode::Radiance, "queried radiance contribution"},
+        {(uint32_t)NRCVisualizeMode::Factor, "factor of radiance contribution"},
+        {(uint32_t)NRCVisualizeMode::Bias, "bias of radiance"},
+        {(uint32_t)NRCVisualizeMode::Reflectance, "reflectance diffuse + specular"}
+    };
 
     const Falcor::ChannelList kOutputChannels =
     {
@@ -100,6 +110,9 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mNRC.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+        /*mNRC.pScreenQueryReflectance = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);*/
+
         // also register these resource to NRCInterface again
         mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadiaceQuery, mNRC.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
             mNRC.pSharedCounterBuffer);
@@ -171,23 +184,26 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
         mNRCOptionChanged = true;
     }
     if(mNRC.enableNRC){
-        if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
-            ||widget.var("Max training suffix bounces", mNRC.max_training_bounces, 3, 15, 1)     
-            ||widget.var("Max RR suffix bounces", mNRC.max_training_rr_bounces, 3, 15, 1)) {
-            mOptionsChanged = true;
+        if (auto logGroup = widget.group("NRC Lowlevel Params")) {
+            if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
+                || widget.var("Max training suffix bounces", mNRC.max_training_bounces, 3, 15, 1)
+                || widget.var("Max RR suffix bounces", mNRC.max_training_rr_bounces, 3, 15, 1)) {
+                mOptionsChanged = true;
+            }
         }
         widget.var("Terminate heuristic threshold", mNRC.terminate_footprint_thres, 0.f, 60.f, 0.01f);
         if (auto logGroup = widget.group("NRC Debug")) {
             // widget.group creates a sub widget.
             mTracer.pNRCPixelStats->renderUI(logGroup);
+            widget.checkbox("visualize NRC", mNRC.visualizeNRC);
+            widget.tooltip("Query the NRC at primary vertices.");
+            widget.tooltip("visualize factor of the NRC contribution query");
+            widget.dropdown("visualize mode", kNRCVisualizeModeList, mNRC.visualizeMode);
+            if (widget.button("reset network")) {
+                mNRC.pNRC->resetParameters();
+            }
         }
-        widget.checkbox("visualize NRC", mNRC.visualizeNRC);
-        widget.tooltip("Query the NRC at primary vertices.");
-        widget.checkbox("visualize factor", mNRC.visualizeFactor);
-        widget.tooltip("visualize factor of the NRC contribution query");
-        if (widget.button("reset network")) {
-            mNRC.pNRC->resetParameters();
-        }
+
     }
 
 }
@@ -373,9 +389,12 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
     pVars["gTrainingRadianceSample"] = mNRC.pTrainingRadianceSample;
 
-    mCompositePass["CompositeCB"]["gVisualizeFactor"] = mNRC.visualizeFactor;
+    mCompositePass["CompositeCB"]["gVisualizeMode"] = mNRC.visualizeMode;
+    mCompositePass["CompositeCB"]["gReflectanceFact"] = (bool)REFLECTANCE_FACT;
     mCompositePass["factor"] = mNRC.pScreenQueryFactor;
     mCompositePass["bias"] = mNRC.pScreenQueryBias;
     mCompositePass["radiance"] = mNRC.pScreenResult;
+    mCompositePass["diffuse"] = renderData["mtlDiffOpacity"]->asTexture();
+    mCompositePass["specular"] = renderData["mtlSpecRough"]->asTexture();
     mCompositePass["output"] = renderData[kNRCResultOutput]->asTexture();
 }

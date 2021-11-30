@@ -66,12 +66,14 @@ m.frameCapture.outputDir = '../../../Outputs/Image/NRC'
 m.frameCapture.baseFilename = param_base_filename
 m.frameCapture.ui = False
 
-for i in range(param_n_image_frames):
+for i in range(param_n_image_frames * param_n_image_skip_frames):
     # m.scene.animated = False
     # m.clock.pause()
     # m.clock.frame = i
     m.renderFrame()
-    m.frameCapture.baseFilename = f"{param_base_filename}_{i:04d}"
-    m.frameCapture.capture()
-    #m.scene.animated = True
-    m.clock.step(frames=param_n_image_skip_frames)
+    if i % param_n_image_skip_frames == 0:
+        idx = i / param_n_image_skip_frames
+        m.frameCapture.baseFilename = f"{param_base_filename}_{idx:04d}"
+        m.frameCapture.capture()
+        #m.scene.animated = True
+    m.clock.step(frames=1)

@@ -4,6 +4,7 @@
 
 #include "Network.h"
 #include "Helpers.h"
+#include "Parameters.h"
 
 #include <tiny-cuda-nn/misc_kernels.h>
 #include <tiny-cuda-nn/config.h>
@@ -11,9 +12,6 @@
 
 using namespace tcnn;
 using precision_t = tcnn::network_precision_t;
-
-#define AUX_INPUTS
-#define REFLECTANCE_FACT
 
 #define GPUMatrix GPUMatrix<float, CM>
 
@@ -24,7 +22,7 @@ namespace {
     const uint32_t batch_size = 1 << 14;
     const uint32_t n_train_batch = 4;
     const uint32_t self_query_batch_size = 1 << 16;     // ~ 57600
-#ifdef AUX_INPUTS
+#if AUX_INPUTS
     const uint32_t input_dim = 14;         // pos dir normal roughness diffuse specular
 #else
     const uint32_t input_dim = 5;           // pos, dir
@@ -69,7 +67,7 @@ __device__ void copyQuery(T* data, const NRC::RadianceQuery* query) {
     
     data[0] = query->pos.x, data[1] = query->pos.y, data[2] = query->pos.z;
     data[3] = query->dir.x, data[4] = query->dir.y;
-#ifdef AUX_INPUTS
+#if AUX_INPUTS
     data[5] = query->roughness;
     data[6] = query->normal.x, data[7] = query->normal.y;
     data[8] = query->diffuse.x, data[9] = query->diffuse.y, data[10] = query->diffuse.z;
@@ -114,7 +112,7 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
         float3 pred_radiance = { 0, 0, 0 };
         if (pred_index >= 0)    // else the sample doesn't contain a self query.
             pred_radiance = { self_query_pred[pred_index * 3], self_query_pred[pred_index * 3 + 1], self_query_pred[pred_index * 3 + 2] };
-#ifdef REFLECTANCE_FACT
+#if REFLECTANCE_FACT
         float3 reflectance = samples[sample_index].query.diffuse + samples[sample_index].query.specular;
         if (pred_index >= 0)
             pred_radiance = pred_radiance * (self_queries[pred_index].diffuse + self_queries[pred_index].specular); 
@@ -134,8 +132,8 @@ __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
     uint32_t index = i * 3;
     float3 radiance = { data[index + 0] , data[index + 1], data[index + 2] };
 
-#ifdef REFLECTANCE_FACT
-    radiance = radiance * (queries[i].diffuse + queries[i].specular);
+#if REFLECTANCE_FACT
+    //radiance = radiance * (queries[i].diffuse + queries[i].specular);
 #endif
     float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
     surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
@@ -151,8 +149,8 @@ __global__ void mapPredRadianceToScreen2(NRC::RadianceQuery* queries, T* data, c
         uint32_t data_index = index * 3;
         float3 radiance = { data[data_index + 0], data[data_index + 1], data[data_index + 2]};
 
-#ifdef REFLECTANCE_FACT
-        radiance = radiance * (queries[index].diffuse + queries[index].specular);
+#if REFLECTANCE_FACT
+        //radiance = radiance * (queries[index].diffuse + queries[index].specular);
 #endif
         float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
         surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
@@ -204,7 +202,7 @@ namespace NRC {
 
         mNetwork->loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
         mNetwork->optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-#ifdef AUX_INPUTS
+#if AUX_INPUTS
         mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(8, 6, output_dim, encoding_opts, network_opts);
 #else
         mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, 0, output_dim, encoding_opts, network_opts);

@@ -61,7 +61,7 @@ private:
 
         bool enableNRC = true;
         bool visualizeNRC = false;
-        bool visualizeFactor = false;
+        uint32_t visualizeMode = 1;
         float prob_rr_suffix_absorption = 0.2f;
         float terminate_footprint_thres = 50.f;
         int max_training_bounces = 5;               // max path segments for training suffix
@@ -74,6 +74,7 @@ private:
         Buffer::SharedPtr pSharedCounterBuffer = nullptr;
         Texture::SharedPtr pScreenQueryFactor = nullptr;
         Texture::SharedPtr pScreenQueryBias = nullptr;
+        Texture::SharedPtr pScreenQueryReflectance = nullptr;
         Texture::SharedPtr pScreenResult = nullptr;
 
     } mNRC;

@@ -47,6 +47,7 @@
   </ItemGroup>
   <ItemGroup>
     <ShaderSource Include="Composite.cs.slang" />
+    <ShaderSource Include="DataStructure.slang" />
     <ShaderSource Include="Debug\NRCPixelStats.slang" />
     <ShaderSource Include="Debug\NRCPixelStatsShared.slang" />
     <ShaderSource Include="NRC.slang" />
