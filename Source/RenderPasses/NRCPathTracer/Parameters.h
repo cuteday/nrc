@@ -20,7 +20,7 @@ namespace NRC {
 
         const unsigned int max_inference_query_size = 1920 * 1080;
         const unsigned int max_training_query_size = 1 << 16;                   // ~57,600
-        const unsigned int max_training_sample_size = 1920 * 1080 / 36 * 10;
+        const unsigned int max_training_sample_size = 1920 * 1080 / 36 * 15;
         const uint2 trainingPathStride = uint2( 6, 6 );
         const uint2 trainingPathStrideRR = uint2( 24, 24 );
     }

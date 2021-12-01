@@ -291,16 +291,16 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             //cudaMemcpy(&queryCounter, mNRC.pNRC->mFalcorResources.trainingQueryCounter, sizeof(float), cudaMemcpyDeviceToHost);
             //std::cout << "sample count: " << sampleCounter << std::endl;
         }
+        {
+            // this takes ~12ms
+            PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
+            mNRC.pNRC->inferenceFrame();
+        }
         if (!mNRC.visualizeNRC)
         {
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Training");
             // no, we make training process an ansynchronous step.
             mNRC.pNRC->trainFrame();
-        }
-        {
-            // this takes ~12ms
-            PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");
-            mNRC.pNRC->inferenceFrame();
         }
         {
             PROFILE("NRCPathTracer::execute()_Composite_Outputs");

@@ -11,7 +11,7 @@ def render_graph_PathTracerGraph():
     g.addPass(ToneMappingPass, "NRCToneMapped")
     GBufferRT = createPass("GBufferRT", {'forceCullMode': False, 'cull': CullMode.CullBack, 'samplePattern': SamplePattern.Halton, 'sampleCount': 1024})
     g.addPass(GBufferRT, "GBufferRT")
-    NRCPathTracer = createPass("NRCPathTracer", {'params': PathTracerParams(useVBuffer=0)})
+    NRCPathTracer = createPass("NRCPathTracer", {'params': PathTracerParams(useVBuffer=0, maxBounces=15, maxNonSpecularBounces=15)})
     g.addPass(NRCPathTracer, "NRCPathTracer")
     g.addEdge("GBufferRT.vbuffer", "NRCPathTracer.vbuffer")      # Required by ray footprint.
     g.addEdge("GBufferRT.posW", "NRCPathTracer.posW")
