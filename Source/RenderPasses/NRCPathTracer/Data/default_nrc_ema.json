@@ -5,9 +5,9 @@
 	"optimizer": {
 		"otype": "Ema",
 		"decay": 0.99,
-		"nested":{
+		"nested": {
 			"otype": "Adam",
-			"learning_rate":2e-5,
+			"learning_rate": 5e-3,
 			"beta1": 0.9,
 			"beta2": 0.99,
 			"epsilon": 1e-8,
@@ -17,7 +17,7 @@
 	"encoding": {
 		"otype": "NRC",
 		"n_bins": 4,
-		"n_frequencies": 12		
+		"n_frequencies": 12
 	},
 	"network": {
 		"otype": "FullyFusedMLP",

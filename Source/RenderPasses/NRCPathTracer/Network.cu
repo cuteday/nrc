@@ -41,8 +41,6 @@ namespace {
         std::shared_ptr<Optimizer<precision_t>> optimizer = nullptr;
         std::shared_ptr<NetworkWithInputEncoding<precision_t>> network = nullptr;
         std::shared_ptr<Trainer<float, precision_t, precision_t>> trainer = nullptr;
-        //std::shared_ptr<Network<precision_t>> network = nullptr;
-        //std::shared_ptr<Encoding<precision_t>> encoding = nullptr;
     };
 
     struct _Memory {
@@ -171,8 +169,8 @@ namespace NRC {
     NRCNetwork::NRCNetwork()
     {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
-        CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
-        //training_stream = inference_stream;
+        //CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
+        training_stream = inference_stream;
 
         CURAND_CHECK_THROW(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT));
         CURAND_CHECK_THROW(curandSetPseudoRandomGeneratorSeed(rng, 7272ULL));
@@ -210,6 +208,7 @@ namespace NRC {
 #endif
         mNetwork->trainer = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork->network, mNetwork->optimizer, mNetwork->loss);
 
+        learning_rate = mNetwork->optimizer->learning_rate();
         mMemory->training_data = new GPUMatrix(input_dim, batch_size);
         mMemory->training_target = new GPUMatrix(output_dim, batch_size);
         mMemory->inference_data = new GPUMatrix(input_dim, resolution);
@@ -250,6 +249,9 @@ namespace NRC {
     void NRCNetwork::train(RadianceQuery* self_queries, uint32_t* self_query_counter,
         RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss)
     {
+        // setup change-able parameters
+        mNetwork->optimizer->set_learning_rate(learning_rate);
+
         // self query
         linear_kernel(generateBatchSequential<input_dim>, 0, training_stream, self_query_batch_size,
             0, self_queries, mMemory->training_self_query->data());
@@ -257,7 +259,7 @@ namespace NRC {
 
         // training
 #if 1   // randomly select 4 training batches over all samples
-        //CURAND_CHECK_THROW(curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size));
+        CURAND_CHECK_THROW(curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size));
         for (uint32_t i = 0; i < n_train_batch; i++) {
             linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
                 i * batch_size, training_samples, self_queries, mMemory->training_self_pred->data(),

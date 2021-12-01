@@ -33,7 +33,7 @@ PathTracerGraph = render_graph_PathTracerGraph()
 try: m.addGraph(PathTracerGraph)
 except NameError: None
 
-param_n_train_frames = 2048
+param_n_train_frames = 1024
 param_n_accumulate_frames = 256
 param_n_video_frames = 60
 param_n_image_frames = 50
@@ -72,7 +72,7 @@ for i in range(param_n_image_frames * param_n_image_skip_frames):
     # m.clock.frame = i
     m.renderFrame()
     if i % param_n_image_skip_frames == 0:
-        idx = i / param_n_image_skip_frames
+        idx = int(i / param_n_image_skip_frames)
         m.frameCapture.baseFilename = f"{param_base_filename}_{idx:04d}"
         m.frameCapture.capture()
         #m.scene.animated = True

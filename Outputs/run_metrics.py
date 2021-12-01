@@ -20,7 +20,7 @@ if __name__ == "__main__":
     for i in range(Params.n_images):
         frame_count = i * Params.n_skip_frames
         path_ref = os.path.join(Params.base_folder, "GT", f"{Params.base_filename}_ref_{i:04d}.TonemappingPass.dst.{frame_count}.png")
-        path_cp1 = os.path.join(Params.base_folder, "NRC", f"{Params.base_filename}_nrc_{i:04d}.NRCToneMapped.dst.{frame_count}.png")
+        path_cp1 = os.path.join(Params.base_folder, "NRC", 'adam', f"{Params.base_filename}_nrc_{i:04d}.NRCToneMapped.dst.{frame_count}.png")
         path_cp2 = os.path.join(Params.base_folder, "PT", f"{Params.base_filename}_pt_{i:04d}.TonemappingPass.dst.{frame_count}.png")
 
         img_ref = cv2.imread(path_ref)

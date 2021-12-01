@@ -7,8 +7,6 @@ Texture2D<float4> bias;
 Texture2D<float4> factor;
 Texture2D<float4> radiance;
 Texture2D<float4> reflectance;
-/*Texture2D<float4> diffuse;
-Texture2D<float4> specular;*/
 RWTexture2D<float4> output;
 
 [numthreads(16, 16, 1)]

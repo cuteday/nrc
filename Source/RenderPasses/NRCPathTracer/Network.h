@@ -29,6 +29,7 @@ namespace NRC {
 
         void initializeNetwork();
         void reset();
+        float& learningRate() { return learning_rate; };
 
         __host__ void inference(RadianceQuery* queries, cudaSurfaceObject_t output, uint32_t width, uint32_t height);
         __host__ void train(RadianceQuery* self_queries, uint32_t* self_query_counter,
@@ -36,6 +37,7 @@ namespace NRC {
 
     private:
         uint32_t seed = 7272u;
+        float learning_rate = 1e-4f;
     };
 }
 

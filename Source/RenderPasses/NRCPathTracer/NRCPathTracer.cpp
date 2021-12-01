@@ -82,6 +82,7 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     if (!state) return false;
     if (!mNRC.pNRC) {
         mNRC.pNRC = NRC::NRCInterface::SharedPtr(new NRC::NRCInterface());
+        mNRC.pNetwork = mNRC.pNRC->network;
     }
     if (!mNRC.pTrainingRadianceQuery) {
         /* there are 3 ways to create a structured buffer shader resource */
@@ -184,7 +185,7 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
         mNRCOptionChanged = true;
     }
     if(mNRC.enableNRC){
-        if (auto logGroup = widget.group("NRC Lowlevel Params")) {
+        if (auto group = widget.group("NRC Lowlevel Params")) {
             if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
                 || widget.var("Max training suffix bounces", mNRC.max_training_bounces, 3, 15, 1)
                 || widget.var("Max RR suffix bounces", mNRC.max_training_rr_bounces, 3, 15, 1)) {
@@ -192,18 +193,21 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
             }
         }
         widget.var("Terminate heuristic threshold", mNRC.terminate_footprint_thres, 0.f, 60.f, 0.01f);
-        if (auto logGroup = widget.group("NRC Debug")) {
+        if (auto group = widget.group("NRC Debug")) {
             // widget.group creates a sub widget.
-            mTracer.pNRCPixelStats->renderUI(logGroup);
+            mTracer.pNRCPixelStats->renderUI(group);
             widget.checkbox("visualize NRC", mNRC.visualizeNRC);
             widget.tooltip("Query the NRC at primary vertices.");
             widget.tooltip("visualize factor of the NRC contribution query");
             widget.dropdown("visualize mode", kNRCVisualizeModeList, mNRC.visualizeMode);
+ 
+        }
+        if (auto group = widget.group("Network Params")) {
             if (widget.button("reset network")) {
                 mNRC.pNRC->resetParameters();
             }
+            widget.var("Learning rate", mNRC.pNetwork->learningRate(), 0.f, 1e-2f, 1e-5f);
         }
-
     }
 
 }
@@ -390,14 +394,11 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
     pVars["gTrainingRadianceSample"] = mNRC.pTrainingRadianceSample;
 
-
     mCompositePass["CompositeCB"]["gVisualizeMode"] = mNRC.visualizeMode;
     mCompositePass["CompositeCB"]["gReflectanceFact"] = (bool)REFLECTANCE_FACT;
     mCompositePass["factor"] = mNRC.pScreenQueryFactor;
     mCompositePass["bias"] = mNRC.pScreenQueryBias;
     mCompositePass["radiance"] = mNRC.pScreenResult;
     mCompositePass["reflectance"] = mNRC.pScreenQueryReflectance;
-    //mCompositePass["diffuse"] = renderData["mtlDiffOpacity"]->asTexture();
-    //mCompositePass["specular"] = renderData["mtlSpecRough"]->asTexture();
     mCompositePass["output"] = renderData[kNRCResultOutput]->asTexture();
 }

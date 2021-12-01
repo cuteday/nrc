@@ -1,0 +1,3 @@
+[submodule ".\\Source\\tiny-cuda-nn"]
+	path = .\\Source\\tiny-cuda-nn
+	url = https://github.com/cuteday/tiny-cuda-nn.git
