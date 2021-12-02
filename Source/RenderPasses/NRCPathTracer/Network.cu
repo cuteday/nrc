@@ -17,20 +17,6 @@ using precision_t = tcnn::network_precision_t;
 
 namespace {
 
-    // 4 steps each frame, with 16384 samples per batch
-    uint32_t resolution = 1920 * 1080;    // is a multiple of 256
-    const uint32_t batch_size = 1 << 14;
-    const uint32_t n_train_batch = 4;
-    const uint32_t self_query_batch_size = 1 << 16;     // ~ 57600
-#if AUX_INPUTS
-    const uint32_t input_dim = 14;         // pos dir normal roughness diffuse specular
-#else
-    const uint32_t input_dim = 5;           // pos, dir
-#endif
-    const uint32_t output_dim = 3;        // RGB
-    //const uint32_t alignment = 16;        // input dim alignment
-    const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc_ema.json";
-
     // cuda related
     cudaStream_t inference_stream;
     cudaStream_t training_stream;
@@ -165,12 +151,14 @@ __global__ void chkNaN(uint32_t n_elements, T* data) {
     }
 }
 
+using namespace NRC::Parameters;
+
 namespace NRC {
     NRCNetwork::NRCNetwork()
     {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
         CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
-        training_stream = inference_stream;
+        //training_stream = inference_stream;
 
         CURAND_CHECK_THROW(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT));
         CURAND_CHECK_THROW(curandSetPseudoRandomGeneratorSeed(rng, 7272ULL));
@@ -298,6 +286,6 @@ namespace NRC {
         mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
         std::cout << "Loss at current step: " << loss << std::endl;
 #endif
-        cudaStreamSynchronize(training_stream);
+        //cudaStreamSynchronize(training_stream);
     }
 }
