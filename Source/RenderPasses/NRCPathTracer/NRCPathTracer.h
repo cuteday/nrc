@@ -64,7 +64,9 @@ private:
         bool visualizeNRC = false;
         uint32_t visualizeMode = 1;
         float prob_rr_suffix_absorption = 0.2f;
-        float terminate_footprint_thres = 50.f;
+        float footprint_thres_inference = 2.5f;
+        float foorprint_thres_suffix = 20.f;
+
         int max_training_bounces = 5;               // max path segments for training suffix
         int max_training_rr_bounces = 10;
         int max_inference_bounces = 5;

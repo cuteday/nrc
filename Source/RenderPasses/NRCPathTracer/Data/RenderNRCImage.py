@@ -26,6 +26,7 @@ def render_graph_PathTracerGraph():
     g.addEdge("NRCPathTracer.color", "AccumulatePass.input")
     g.addEdge("AccumulatePass.output", "ToneMapped.src")
     g.addEdge("NRCPathTracer.result", "NRCToneMapped.src")
+    g.markOutput("NRCPathTracer.result")
     g.markOutput("NRCToneMapped.dst")
     return g
 
@@ -49,13 +50,13 @@ m.loadScene('../../../Media/ORCA/ZeroDay_v1/MEASURE_SEVEN/zeroday_colored.pyscen
 # We firstly give the NRC a warm-up, that is, train the network for about ~10s,
 # after it converges, run the inference at given viewpoints.
 ########################################################################################
+m.clock.framerate = 60
 for _ in range(param_n_train_frames):
     m.renderFrame()
 
 # configures clock and framerate so the timepoint of the frames we rendered are deterministic
 
 m.clock.stop()	# pause AND reset the clock
-m.clock.framerate = 60
 
 ########################################################################################
 # The following code renders the first 10 frames, at a 24fps speed, as reference images.

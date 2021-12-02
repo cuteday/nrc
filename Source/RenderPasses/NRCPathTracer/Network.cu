@@ -169,7 +169,7 @@ namespace NRC {
     NRCNetwork::NRCNetwork()
     {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
-        //CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
+        CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
         training_stream = inference_stream;
 
         CURAND_CHECK_THROW(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT));

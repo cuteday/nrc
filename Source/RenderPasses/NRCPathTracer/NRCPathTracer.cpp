@@ -192,7 +192,9 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
                 mOptionsChanged = true;
             }
         }
-        widget.var("Terminate heuristic threshold", mNRC.terminate_footprint_thres, 0.f, 60.f, 0.01f);
+        widget.var("Terminate threshold inference", mNRC.footprint_thres_inference, 0.f, 15.f, 0.001f);
+        widget.var("Terminate threshold suffix", mNRC.foorprint_thres_suffix, 0.f, 50.f, 0.001f);
+
         if (auto group = widget.group("NRC Debug")) {
             // widget.group creates a sub widget.
             mTracer.pNRCPixelStats->renderUI(group);
@@ -381,7 +383,8 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gNRCTrainingPathStride"] = Parameters::trainingPathStride;
     pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = Parameters::trainingPathStrideRR;
     pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;
-    pVars["NRCDataCB"]["gTerminateFootprintThres"] = mNRC.terminate_footprint_thres;
+    pVars["NRCDataCB"]["gFootprintThresInference"] = mNRC.footprint_thres_inference;
+    pVars["NRCDataCB"]["gFootprintThresSuffix"] = mNRC.foorprint_thres_suffix;
     // scene AABB for normalizing coordinates
     pVars["NRCDataCB"]["gSceneAABBCenter"] = mpScene->getSceneBounds().center();
     pVars["NRCDataCB"]["gSceneAABBExtent"] = mpScene->getSceneBounds().extent();

@@ -1,3 +1,5 @@
+#include "Utils/Math/MathConstants.slangh"
+
 import Scene.ShadingData;
 import Utils.Math.MathHelpers;
 import RenderPasses.Shared.PathTracer.PathData;
@@ -20,7 +22,8 @@ cbuffer NRCDataCB
     bool gVisualizeMode;
     bool gIsTrainingPass;               // If we are in the training pass, dispatch training suffix via sparse sampling
     float gNRCAbsorptionProb;
-    float gTerminateFootprintThres;     // hyperparam for ray termination heuristic
+    float gFootprintThresInference;     // hyperparam for ray termination heuristic
+    float gFootprintThresSuffix;
     uint2 gNRCScreenSize;               // width x height
     uint2 gNRCTrainingPathStride;       // uniform sparse sample paths for training
     uint2 gNRCTrainingPathOffset;       // random offset each frame, for the sparse sample
@@ -39,20 +42,31 @@ enum NRCPathType
 
 struct NRCRayFootprint{
     float spread;
+    float a0;
+    bool first_bounce;
+    bool suffix;
 
     // the ray bounces from U to V.
     NRCRayFootprint nextBounce(float3 u, float3 v, float pdf, float NdotV)
-    { 
+    {
+        float a0_ = this.a0, spread_ = this.spread;
+        float duv = distance(u, v);
         NdotV = max(NdotV, 0.01);
-        float current = distance(u, v) / pdf / NdotV;
-        if (pdf == 0) current = 0;      // sampled using a delta func.
-        //this.spread += current;
-        return { spread + current };
+        if (this.first_bounce) {
+            a0_ = duv * duv / NdotV / (4 * M_PI);
+        }
+        else {
+            float current = pdf != 0 ? sqrt(duv * duv / pdf / NdotV) : 0;
+            // sampled using a delta func if pdf == 0.
+            spread_ += current;
+        }
+        return { spread_, a0_, false, this.suffix };
     }
 
     bool terminate()
     {
-        return spread > gTerminateFootprintThres;
+        float thres = this.suffix ? gFootprintThresSuffix : gFootprintThresInference;
+        return !first_bounce && this.spread > this.a0 * thres;
     }
 };
 

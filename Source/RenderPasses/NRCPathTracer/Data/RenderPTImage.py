@@ -22,8 +22,8 @@ def render_graph_PathTracerGraph():
     g.addEdge("GBufferRT.specRough", "MegakernelPathTracer.mtlSpecRough")
     g.addEdge("GBufferRT.emissive", "MegakernelPathTracer.mtlEmissive")
     g.addEdge("GBufferRT.matlExtra", "MegakernelPathTracer.mtlParams")
-    g.addEdge("MegakernelPathTracer.color", "AccumulatePass.input")
-    g.addEdge("AccumulatePass.output", "ToneMappingPass.src")
+    g.addEdge("MegakernelPathTracer.color", "ToneMappingPass.src")
+    g.markOutput("MegakernelPathTracer.color")
     g.markOutput("ToneMappingPass.dst")
     return g
 

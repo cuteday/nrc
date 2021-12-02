@@ -12,7 +12,7 @@ def render_graph_PathTracerGraph():
     g.addPass(GBufferRT, "GBufferRT")
     MegakernelPathTracer = createPass("MegakernelPathTracer", {'params': PathTracerParams(
         samplesPerPixel=1, useFixedSeed = False,
-        useVBuffer=0, maxBounces=20, maxNonSpecularBounces=20, useRussianRoulette=True, probabilityAbsorption=0.2)})
+        useVBuffer=0, maxBounces=20, maxNonSpecularBounces=20, useRussianRoulette=True, probabilityAbsorption=0.15)})
     g.addPass(MegakernelPathTracer, "MegakernelPathTracer")
     g.addEdge("GBufferRT.vbuffer", "MegakernelPathTracer.vbuffer")      # Required by ray footprint.
     g.addEdge("GBufferRT.posW", "MegakernelPathTracer.posW")
@@ -26,6 +26,7 @@ def render_graph_PathTracerGraph():
     g.addEdge("GBufferRT.matlExtra", "MegakernelPathTracer.mtlParams")
     g.addEdge("MegakernelPathTracer.color", "AccumulatePass.input")
     g.addEdge("AccumulatePass.output", "ToneMappingPass.src")
+    g.markOutput("AccumulatePass.output")
     g.markOutput("ToneMappingPass.dst")
     return g
 

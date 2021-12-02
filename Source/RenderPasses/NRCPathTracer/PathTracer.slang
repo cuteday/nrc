@@ -368,7 +368,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     const uint kMaxInferenceIter = NRC_MAX_INFERENCE_BOUNCES + 1;
     bool normalTerminate = true;
     bool lastScatterMissed = false;
-    NRCRayFootprint inferenceRayFootprint = { 0.0 };
+    NRCRayFootprint inferenceRayFootprint = { 0, 0, true, false };
 
     /* inference loop! */
     [loop]
@@ -376,7 +376,6 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     {
         {   // do a training sample snapshot here
             pathRecords[path.length] = generatePathVertexRecord(path, sd);
-            // calculate and update ray footprint for termination heuristic
         }
 
         uint lobes = pt.standardMaterial.getBSDFLobes(sd);
@@ -423,7 +422,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
             handleHit(pt, sd, path);
             // update ray footprint information
             inferenceRayFootprint = inferenceRayFootprint.nextBounce(prevPos, sd.posW, path.pdf, sd.NdotV);
-/*            {
+            {
                 // ray footprint heuristic debugging... 
                 print("At path depth: ", path.length);
                 print("Path pdf: ", path.pdf);
@@ -431,7 +430,8 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
                 print("Ray spread: ", inferenceRayFootprint.spread);
                 print("Path origin: ", prevPos);
                 print("Path intersection: ", sd.posW);
-            }*/
+                print("Path a0: ", inferenceRayFootprint.a0);
+            }
         }
         else
         {   // add MIS weighted contribution from environment map.
@@ -439,7 +439,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
             handleMiss(pt, path);
         }
 
-        if (isQueryVertex) break;
+        if (isQueryVertex || inferenceRayFootprint.terminate()) break;
         if (!validHit) break;  
     }
 
@@ -464,7 +464,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     // save outputs at the query vertex
 
     // basically, if we needs to query the NRC, we use this flag and adds a query to the structured buffer.
-    NRCRayFootprint suffixRayFootprint = { 0.0 };
+    NRCRayFootprint suffixRayFootprint = { 0, 0, true, true };
     bool needsQuery = pathType == NRCPathType::TrainingPath;
     const uint kMaxTrainingSuffixIter = pathType == NRCPathType::TrainingPathRR ?
         NRC_MAX_TRAINING_RR_BOUNCES + 1: NRC_MAX_TRAINING_BOUNCES + 1;
@@ -540,6 +540,7 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
 
             if (!validHit) break;
             if (isLastVertex) break;
+            if (needsQuery && suffixRayFootprint.terminate()) break;
         }
     }
 
