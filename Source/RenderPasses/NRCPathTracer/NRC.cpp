@@ -32,7 +32,6 @@ namespace NRC {
 
     void NRCInterface::inferenceFrame()
     {
-        int n_queries = mParameters.screenSize.x * mParameters.screenSize.y;
         network->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
             mParameters.screenSize.x, mParameters.screenSize.y);
     }
