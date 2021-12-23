@@ -34,17 +34,30 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ShaderSource Include="PathTracer.rt.slang" />
-    <ShaderSource Include="PathTracer.slang" />
-    <ShaderSource Include="NRC.slang" />
     <ShaderSource Include="Debug\NRCPixelStats.slang">
       <Filter>Debug</Filter>
     </ShaderSource>
     <ShaderSource Include="Debug\NRCPixelStatsShared.slang">
       <Filter>Debug</Filter>
     </ShaderSource>
-    <ShaderSource Include="Composite.cs.slang" />
-    <ShaderSource Include="DataStructure.slang" />
+    <ShaderSource Include="NRC.slang">
+      <Filter>Shader</Filter>
+    </ShaderSource>
+    <ShaderSource Include="Composite.cs.slang">
+      <Filter>Shader</Filter>
+    </ShaderSource>
+    <ShaderSource Include="DataStructure.slang">
+      <Filter>Shader</Filter>
+    </ShaderSource>
+    <ShaderSource Include="PathTracer.slang">
+      <Filter>Shader</Filter>
+    </ShaderSource>
+    <ShaderSource Include="PathTracer.rt.slang">
+      <Filter>Shader</Filter>
+    </ShaderSource>
+    <ShaderSource Include="NRCPathTracer.slang">
+      <Filter>Shader</Filter>
+    </ShaderSource>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="NN">
@@ -55,6 +68,9 @@
     </Filter>
     <Filter Include="Debug">
       <UniqueIdentifier>{fd716e4b-bd1f-4dc5-91b4-8ced1d758853}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shader">
+      <UniqueIdentifier>{f9c9edca-0a3b-431b-bfe1-591747c9dd96}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -6,6 +6,7 @@
 #include "Helpers.h"
 #include "Parameters.h"
 
+#include <curand.h>
 #include <tiny-cuda-nn/misc_kernels.h>
 #include <tiny-cuda-nn/config.h>
 #include <tiny-cuda-nn/common.h>
@@ -160,9 +161,9 @@ namespace NRC {
         CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
         //training_stream = inference_stream;
 
-        CURAND_CHECK_THROW(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT));
-        CURAND_CHECK_THROW(curandSetPseudoRandomGeneratorSeed(rng, 7272ULL));
-        CURAND_CHECK_THROW(curandSetStream(rng, training_stream));
+        curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
+        curandSetPseudoRandomGeneratorSeed(rng, 7272ULL);
+        curandSetStream(rng, training_stream);
 
         initializeNetwork();
     }
@@ -205,7 +206,7 @@ namespace NRC {
         mMemory->training_self_pred = new GPUMatrix(output_dim, self_query_batch_size);
 
         mMemory->random_seq = new GPUMemory<float>(n_train_batch * batch_size);
-        CURAND_CHECK_THROW(curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size));
+        curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size);
     }
 
     void NRCNetwork::reset()
@@ -247,7 +248,7 @@ namespace NRC {
 
         // training
 #if 1   // randomly select 4 training batches over all samples
-        CURAND_CHECK_THROW(curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size));
+        curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size);
         for (uint32_t i = 0; i < n_train_batch; i++) {
             linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
                 i * batch_size, training_samples, self_queries, mMemory->training_self_pred->data(),
