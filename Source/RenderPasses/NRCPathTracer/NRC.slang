@@ -2,6 +2,7 @@
 
 import Scene.ShadingData;
 import Utils.Math.MathHelpers;
+import Utils.Debug.PixelDebug;
 import RenderPasses.Shared.PathTracer.PathData;
 
 import DataStructure;
@@ -198,4 +199,17 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
     sample.a = a;
     sample.b = b;
     gTrainingRadianceSample[idx] = sample;
+}
+
+/*
+ *  Debug helper functions
+ */
+
+void debugRayFootprint(const PathData path, const NRCRayFootprint footprint)
+{
+    print("At path depth: ", path.length);
+    print("Path pdf: ", path.pdf);
+    print("Ray spread: ", footprint.spread);
+    print("Path intersection: ", path.origin);
+    print("Path a0: ", footprint.a0);
 }

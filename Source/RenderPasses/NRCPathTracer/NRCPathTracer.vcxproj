@@ -51,6 +51,7 @@
     <ShaderSource Include="Debug\NRCPixelStats.slang" />
     <ShaderSource Include="Debug\NRCPixelStatsShared.slang" />
     <ShaderSource Include="NRC.slang" />
+    <ShaderSource Include="NRCPathTracer.slang" />
     <ShaderSource Include="PathTracer.rt.slang" />
     <ShaderSource Include="PathTracer.slang" />
   </ItemGroup>

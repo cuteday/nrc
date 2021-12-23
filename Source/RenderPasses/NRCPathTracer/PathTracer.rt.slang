@@ -8,7 +8,7 @@
 
     is_valid_<name> is 1 if buffer with this name is bound, 0 otherwise.
 */
-import PathTracer;
+import NRCPathTracer;
 import Utils.Timing.GpuTimer;
 import RenderPasses.Shared.PathTracer.LoadShadingData;
 
