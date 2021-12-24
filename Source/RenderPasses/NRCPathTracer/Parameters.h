@@ -45,7 +45,7 @@ namespace NRC {
 #endif
         const uint32_t output_dim = 3;        // RGB
         //const uint32_t alignment = 16;        // input dim alignment
-        const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc_ema.json";
+        const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc_new.json";
 
     }
 }

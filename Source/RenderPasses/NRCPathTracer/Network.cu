@@ -7,7 +7,6 @@
 #include "Parameters.h"
 
 #include <curand.h>
-#include <tiny-cuda-nn/misc_kernels.h>
 #include <tiny-cuda-nn/config.h>
 #include <tiny-cuda-nn/common.h>
 
@@ -17,7 +16,6 @@ using precision_t = tcnn::network_precision_t;
 #define GPUMatrix GPUMatrix<float, CM>
 
 namespace {
-
     // cuda related
     cudaStream_t inference_stream;
     cudaStream_t training_stream;
@@ -117,10 +115,6 @@ __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
     uint32_t x = i % width, y = i / width;
     uint32_t index = i * 3;
     float3 radiance = { data[index + 0] , data[index + 1], data[index + 2] };
-
-#if REFLECTANCE_FACT
-    //radiance = radiance * (queries[i].diffuse + queries[i].specular);
-#endif
     float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
     surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
 }
@@ -134,21 +128,8 @@ __global__ void mapPredRadianceToScreen2(NRC::RadianceQuery* queries, T* data, c
         uint32_t index = y * width + x;
         uint32_t data_index = index * 3;
         float3 radiance = { data[data_index + 0], data[data_index + 1], data[data_index + 2]};
-
-#if REFLECTANCE_FACT
-        //radiance = radiance * (queries[index].diffuse + queries[index].specular);
-#endif
         float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
         surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
-    }
-}
-
-template <typename T = float>
-__global__ void chkNaN(uint32_t n_elements, T* data) {
-    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i > n_elements) return;
-    if (isnan(data[i]) || isinf(data[i])) {
-        data[i] = (T)0.f;
     }
 }
 
@@ -164,7 +145,6 @@ namespace NRC {
         curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(rng, 7272ULL);
         curandSetStream(rng, training_stream);
-
         initializeNetwork();
     }
 
@@ -191,9 +171,9 @@ namespace NRC {
         mNetwork->loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
         mNetwork->optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
 #if AUX_INPUTS
-        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(8, 6, output_dim, encoding_opts, network_opts);
+        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
 #else
-        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, 0, output_dim, encoding_opts, network_opts);
+        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
 #endif
         mNetwork->trainer = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork->network, mNetwork->optimizer, mNetwork->loss);
 
@@ -213,7 +193,7 @@ namespace NRC {
     {
         cudaStreamSynchronize(training_stream);
         cudaStreamSynchronize(inference_stream);
-        mNetwork->trainer->initialize_params(seed);
+        mNetwork->trainer->initialize_params();
     }
 
     void NRCNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,

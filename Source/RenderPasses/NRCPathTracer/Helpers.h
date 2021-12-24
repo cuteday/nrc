@@ -44,5 +44,14 @@ __device__ float4 safe_div(float4 a, float4 b) {
     return res;
 }
 
+template <typename T = float>
+__global__ void chkNaN(uint32_t n_elements, T* data) {
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i > n_elements) return;
+    if (isnan(data[i]) || isinf(data[i])) {
+        data[i] = (T)0.f;
+    }
+}
+
 
 #endif // !1
