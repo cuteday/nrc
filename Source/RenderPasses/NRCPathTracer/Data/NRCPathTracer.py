@@ -4,7 +4,7 @@ def render_graph_PathTracerGraph():
     loadRenderPassLibrary("GBuffer.dll")
     loadRenderPassLibrary("ToneMapper.dll")
     loadRenderPassLibrary("NRCPathTracer.dll")
-    AccumulatePass = createPass("AccumulatePass", {'enabled': True})
+    AccumulatePass = createPass("AccumulatePass", {'enabled': False})
     g.addPass(AccumulatePass, "AccumulatePass")
     ToneMappingPass = createPass("ToneMapper", {'autoExposure': False, 'exposureCompensation': 0.0})
     g.addPass(ToneMappingPass, "NRCToneMapped")
@@ -22,8 +22,8 @@ def render_graph_PathTracerGraph():
     g.addEdge("GBufferRT.specRough", "NRCPathTracer.mtlSpecRough")
     g.addEdge("GBufferRT.emissive", "NRCPathTracer.mtlEmissive")
     g.addEdge("GBufferRT.matlExtra", "NRCPathTracer.mtlParams")
-    g.addEdge("NRCPathTracer.color", "AccumulatePass.input")
-    g.addEdge("NRCPathTracer.result", "NRCToneMapped.src")
+    g.addEdge("NRCPathTracer.result", "AccumulatePass.input")
+    g.addEdge("AccumulatePass.output", "NRCToneMapped.src")
     g.markOutput("NRCToneMapped.dst")
     return g
 

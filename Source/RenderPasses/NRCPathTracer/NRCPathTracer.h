@@ -73,7 +73,8 @@ private:
 
         Buffer::SharedPtr pTrainingRadianceQuery = nullptr;
         Buffer::SharedPtr pTrainingRadianceSample = nullptr;
-        Buffer::SharedPtr pInferenceRadiaceQuery = nullptr;
+        Buffer::SharedPtr pInferenceRadianceQuery = nullptr;
+        Buffer::SharedPtr pInferenceRadiancePixel = nullptr;
         Buffer::SharedPtr pSharedCounterBuffer = nullptr;
         Texture::SharedPtr pScreenQueryFactor = nullptr;
         Texture::SharedPtr pScreenQueryBias = nullptr;
@@ -82,6 +83,7 @@ private:
 
     } mNRC;
 
+    uint32_t* mPinnedMemory = nullptr;
     bool mNRCOptionChanged = true;
     ComputePass::SharedPtr mCompositePass;
     HaltonSamplePattern::SharedPtr mHaltonSampler;

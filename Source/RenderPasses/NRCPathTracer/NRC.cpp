@@ -12,15 +12,15 @@ namespace NRC {
         }
         logInfo("NRCInterface::working directory: " + std::filesystem::current_path().string());
         logInfo("NRCInferface::creating and initializing network");
-        network = NRCNetwork::SharedPtr(new NRCNetwork());
+        mNetwork = NRCNetwork::SharedPtr(new NRCNetwork());
     }
 
     void NRCInterface::trainFrame()
     {
         float loss;
-        /*network->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
+        /*mNetwork->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
             mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);*/
-        network->train(mFalcorResources.trainingQuery, mFalcorResources.trainingQueryCounter,
+        mNetwork->train(mFalcorResources.trainingQuery, mFalcorResources.trainingQueryCounter,
             mFalcorResources.trainingSample, mFalcorResources.trainingSampleCounter, loss);
         mStats.n_frames++;
         mStats.training_loss_avg = mStats.ema_factor * mStats.training_loss_avg + (1 - mStats.ema_factor) * loss;
@@ -32,7 +32,7 @@ namespace NRC {
 
     void NRCInterface::inferenceFrame()
     {
-        network->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
+        mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
             mParameters.screenSize.x, mParameters.screenSize.y);
     }
 
@@ -45,6 +45,6 @@ namespace NRC {
 
     void NRCInterface::resetParameters()
     {
-        network->reset();
+        mNetwork->reset();
     }
 }

@@ -92,6 +92,7 @@ RWStructuredBuffer<RadianceSample> gTrainingRadianceSample;
 
 // radiance query at screen resolution
 RWStructuredBuffer<RadianceQuery> gInferenceRadianceQuery;
+RWStructuredBuffer<uint2> gInferenceRadiancePixel;
 RWTexture2D<float4> gScreenQueryFactor;
 RWTexture2D<float4> gScreenQueryBias;
 RWTexture2D<float4> gScreenQueryReflectance;
@@ -189,8 +190,8 @@ uint addTrainingQuery(ShadingData sd)
 
 void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
 {
-    if (any(isnan(a)) || any(isnan(b)) || any(isinf(a)) || any(isinf(b)))
-        // TODO: is isnan() in hlsl works properly?
+    if (any(isnan(a) || isnan(b) || isinf(a) || isinf(b)))
+        // TODO: does isnan() in hlsl works properly?
         return;
     uint idx = gTrainingRadianceSample.IncrementCounter();
     RadianceSample sample = { };
@@ -204,7 +205,6 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
 /*
  *  Debug helper functions
  */
-
 void debugRayFootprint(const PathData path, const NRCRayFootprint footprint)
 {
     print("At path depth: ", path.length);

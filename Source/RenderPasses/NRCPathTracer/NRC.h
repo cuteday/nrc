@@ -54,7 +54,9 @@ namespace NRC {
         }      
 
 //    private:
-        NRCNetwork::SharedPtr network = nullptr;
+        NRCNetwork::SharedPtr mNetwork = nullptr;
+
+
         struct {
             int n_frames = 0;
             float training_loss_avg = 0;    // EMA

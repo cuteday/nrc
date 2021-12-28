@@ -15,6 +15,13 @@ BEGIN_NAMESPACE_NRC
         float _pad1;
     };
 
+    struct RadianceInfer
+    {
+        RadianceQuery query;
+        uint2 pixel;
+        float2 _pad0;
+    };
+
     struct RadianceSample
     {
         RadianceQuery query;
