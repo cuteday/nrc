@@ -25,6 +25,8 @@ namespace NRC {
 
         NRCInterface();
 
+        void beginFrame();
+
         void trainFrame();
 
         void inferenceFrame();
@@ -49,6 +51,7 @@ namespace NRC {
             mFalcorResources.trainingQuery = (NRC::RadianceQuery*)FalcorCUDA::importResourceToDevicePointer(pTrainingQueryBuffer);
             mFalcorResources.trainingSample = (NRC::RadianceSample*)FalcorCUDA::importResourceToDevicePointer(pTrainingSampleBuffer);
             uint32_t* counterBuffer = (uint32_t*)FalcorCUDA::importResourceToDevicePointer(pSharedCounterBuffer);*/
+            mFalcorResources.counterBufferPtr = counterBuffer;
             mFalcorResources.trainingQueryCounter = &counterBuffer[0];
             mFalcorResources.trainingSampleCounter = &counterBuffer[1];
         }      
@@ -75,6 +78,8 @@ namespace NRC {
             cudaSurfaceObject_t screenResult;       // write inferenced results here
             NRC::RadianceQuery* trainingQuery = nullptr;
             NRC::RadianceSample* trainingSample = nullptr;
+            uint2* inferenceQueryPixel = nullptr;
+            uint32_t* counterBufferPtr = nullptr;
             uint32_t* trainingQueryCounter = nullptr;
             uint32_t* trainingSampleCounter = nullptr;
         }mFalcorResources;

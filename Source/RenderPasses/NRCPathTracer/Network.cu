@@ -55,15 +55,16 @@ namespace {
     };
 
     struct _Counter {   // pinned memory on device
-        uint32_t* training_sample_counter;
-        uint32_t* inference_query_counter;
+        uint32_t training_query_count;
+        uint32_t training_sample_count;
+        uint32_t inference_query_count;
     };
 
     cudaStream_t streamcells[cell_count];
 
     _Memory* mMemory;
     _Network* mNetwork;
-    _Counter* mCounter;
+    _Counter* mCounter;     // pinned memory via cudaHostAlloc
 }
 
 template <typename T>
@@ -90,7 +91,6 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset < n_elements) {
         uint32_t data_index = i * stride, query_index = i + offset;
-
         copyQuery(&data[data_index], &queries[query_index]);
     }
 }
@@ -136,9 +136,8 @@ __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t x = i % width, y = i / width;
     uint32_t index = i * 3;
-    float3 radiance = { data[index + 0] , data[index + 1], data[index + 2] };
-    float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
-    surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
+    float4 radiance = { data[index + 0] , data[index + 1], data[index + 2], 1.0f };
+    surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
 }
 
 template <class T>
@@ -149,10 +148,21 @@ __global__ void mapPredRadianceToScreen2(T* data, cudaSurfaceObject_t output,
     if (x < width && y < height) {
         uint32_t index = y * width + x;
         uint32_t data_index = index * 3;
-        float3 radiance = { data[data_index + 0], data[data_index + 1], data[data_index + 2]};
-        float4 val = { radiance.x, radiance.y, radiance.z, 1.0f };
-        surf2Dwrite(val, output, (int)sizeof(float4) * x, y);
+        float4 radiance = { data[data_index + 0], data[data_index + 1], data[data_index + 2], 1.0f};
+        surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
     }
+}
+
+template <typename T>
+__global__ void mapIndexedRadianceToScreen(uint32_t n_elements, T* data,
+    cudaSurfaceObject_t output, Falcor::uint2* pixels) {
+    uint32_t i = threadIdx.x + blockDim.x * blockIdx.x;
+    if (i > n_elements) return;
+    uint32_t px = pixels[i].x, py= pixels[i].y;
+    uint32_t data_index = i * 3;
+    float4 radiance = { data[data_index], data[data_index + 1], data[data_index + 2], 1.0f };
+    surf2Dwrite(radiance, output, (int)sizeof(float4) * px, py);
+
 }
 
 using namespace NRC::Parameters;
@@ -163,10 +173,10 @@ namespace NRC {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
         CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
         //training_stream = inference_stream;
-
+#if cell_test
         for (int i = 0; i < cell_count; i++)
             CUDA_CHECK_THROW(cudaStreamCreate(&streamcells[i]));
-
+#endif
         curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(rng, 7272ULL);
         curandSetStream(rng, training_stream);
@@ -183,6 +193,7 @@ namespace NRC {
     {
         mNetwork = new _Network();
         mMemory = new _Memory();
+        cudaHostAlloc((void**)&mCounter, 16, cudaHostAllocDefault);
 
         //initialize network
         std::ifstream f(config_path);
@@ -235,6 +246,34 @@ namespace NRC {
         mNetwork->trainer->initialize_params();
     }
 
+    void NRCNetwork::beginFrame(uint32_t* counterBufferDevice)
+    {
+        cudaMemcpy(mCounter, counterBufferDevice, 16, cudaMemcpyDeviceToHost);
+        
+    }
+
+    void NRCNetwork::inference(RadianceQuery* queries, uint2* pixels, cudaSurfaceObject_t output)
+    {
+        uint32_t n_elements = mCounter->inference_query_count;
+        std::cout << "#Inference query count: " << mCounter->inference_query_count << std::endl;
+        std::cout << "#Inference query count: " << n_elements << std::endl;
+        uint32_t next_batch_size = next_multiple(n_elements, 128u);
+        std::cout << "next batch size: " << next_batch_size << std::endl;
+
+        if (!n_elements) return;
+        mMemory->inference_data->set_size(input_dim, next_batch_size);
+        mMemory->inference_target->set_size(output_dim, next_batch_size);
+        
+        std::cout << "current inference data matrix shape: " << mMemory->inference_data->rows() << "," << mMemory->inference_data->cols() << std::endl;
+        std::cout << "current inference target matrix shape: " << mMemory->inference_target->rows() << "," << mMemory->inference_target->cols() << std::endl;
+
+        linear_kernel(generateBatchSequential<input_dim>, 0, inference_stream, n_elements,
+            0, queries, mMemory->inference_data->data());
+        mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
+        linear_kernel(mapIndexedRadianceToScreen<float>, 0, inference_stream, n_elements, mMemory->inference_target->data(), output, pixels);
+        CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
+    }
+
     void NRCNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,
         uint32_t width, uint32_t height)
     {
@@ -246,10 +285,14 @@ namespace NRC {
         
         mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
 
+        // map method #1:
         //linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
+        // map method #2:
         dim3 dimBlock(16, 16), dimGrid(div_round_up(width, 16u), div_round_up(height, 16u));
         mapPredRadianceToScreen2<float> <<<dimGrid, dimBlock, 0, inference_stream >>>
             (mMemory->inference_target->data(), output, width, height);
+        // indexed mapping:
+        //linear_kernel(mapIndexedRadianceToScreen<float>, 0, inference_stream, n_elements, mMemory->inference_target->data(), output, nullptr);
 
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
 
@@ -262,7 +305,7 @@ namespace NRC {
     }
 
     void NRCNetwork::train(RadianceQuery* self_queries, uint32_t* self_query_counter,
-        RadianceSample* training_samples, uint32_t* training_sample_counter_device, float& loss)
+        RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss)
     {
         // setup change-able parameters
         mNetwork->optimizer->set_learning_rate(learning_rate);
@@ -279,7 +322,7 @@ namespace NRC {
             linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
                 i * batch_size, training_samples, self_queries, mMemory->training_self_pred->data(),
                 mMemory->training_data->data(), mMemory->training_target->data(),
-                training_sample_counter_device, self_query_counter, mMemory->random_seq->data());
+                training_sample_counter, self_query_counter, mMemory->random_seq->data());
             mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
         }
         CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));

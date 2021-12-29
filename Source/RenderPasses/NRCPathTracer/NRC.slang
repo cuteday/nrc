@@ -171,13 +171,18 @@ PathVertexRecord generatePathVertexRecord(PathData path, ShadingData sd)
 
 void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
 {
-    RadianceQuery query = generateQuery(sd);
-    uint2 frameDim = gNRCScreenSize;
-    int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
     gScreenQueryFactor[gNRCPixel] = float4(factor, 0);
     gScreenQueryBias[gNRCPixel] = float4(bias, 1);
     gScreenQueryReflectance[gNRCPixel] = float4(sd.specular + sd.diffuse, 1);
-    gInferenceRadianceQuery[index] = query;
+    RadianceQuery query = generateQuery(sd);
+    //uint2 frameDim = gNRCScreenSize;
+    //int index = frameDim.x * gNRCPixel.y + gNRCPixel.x;
+    if (any(factor))
+    {
+        uint index = gInferenceRadianceQuery.IncrementCounter();
+        gInferenceRadianceQuery[index] = query;
+        gInferenceRadiancePixel[index] = gNRCPixel;
+    }
 }
 
 uint addTrainingQuery(ShadingData sd)
@@ -190,7 +195,7 @@ uint addTrainingQuery(ShadingData sd)
 
 void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
 {
-    if (any(isnan(a) || isnan(b) || isinf(a) || isinf(b)))
+    if (any(isnan(a)) || any(isnan(b)) || any(isinf(a)) || any(isinf(b)))
         // TODO: does isnan() in hlsl works properly?
         return;
     uint idx = gTrainingRadianceSample.IncrementCounter();

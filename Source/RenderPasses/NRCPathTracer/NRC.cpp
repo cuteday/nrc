@@ -15,6 +15,11 @@ namespace NRC {
         mNetwork = NRCNetwork::SharedPtr(new NRCNetwork());
     }
 
+    void NRCInterface::beginFrame()
+    {
+        mNetwork->beginFrame(mFalcorResources.counterBufferPtr);
+    }
+
     void NRCInterface::trainFrame()
     {
         float loss;
@@ -32,8 +37,9 @@ namespace NRC {
 
     void NRCInterface::inferenceFrame()
     {
-        mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
-            mParameters.screenSize.x, mParameters.screenSize.y);
+        //mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
+        //    mParameters.screenSize.x, mParameters.screenSize.y);
+        mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.inferenceQueryPixel, mFalcorResources.screenResult);
     }
 
     void NRCInterface::printStats()

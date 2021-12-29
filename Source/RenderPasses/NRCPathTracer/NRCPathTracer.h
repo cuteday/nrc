@@ -83,7 +83,6 @@ private:
 
     } mNRC;
 
-    uint32_t* mPinnedMemory = nullptr;
     bool mNRCOptionChanged = true;
     ComputePass::SharedPtr mCompositePass;
     HaltonSamplePattern::SharedPtr mHaltonSampler;

@@ -93,13 +93,11 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
         if (!validHit) break;  
     }
 
-    if (!gIsTrainingPass)
+    if (!gIsTrainingPass && !gVisualizeMode)
     { 
         // we use these infomation to query the NRC, note that self emission is excluded from the prediction
         // the origin of the next bounce is updated in HandleHit
         // the direction is generated at the previous GenerateScatterRay call
-        float3 scatterDir = -path.dir;
-        float3 scatterOrigin = path.origin;
         float3 throughput = normalTerminate ? path.thp : float3(0);       // the path throughput is updated in generate scatter ray.
         float3 bias = path.L;               // the L already contains the self emission at the hit vertex
         //writeScreenInferenceQuery(scatterOrigin, scatterDir, throughput, bias);
