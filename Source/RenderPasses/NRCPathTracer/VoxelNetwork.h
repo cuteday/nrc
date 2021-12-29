@@ -11,6 +11,8 @@
 
 namespace NRC {
 
+
+
     class VoxelNetwork {
 
     public:
@@ -34,6 +36,7 @@ namespace NRC {
     private:
         uint32_t seed = 7272u;
         float learning_rate = 1e-4f;
+        
     };
 }
 

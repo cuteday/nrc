@@ -81,7 +81,8 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     bool state = PathTracer::beginFrame(pRenderContext, renderData);
     if (!state) return false;
     if (!mNRC.pNRC) {
-        mNRC.pNRC = NRC::NRCInterface::SharedPtr(new NRC::NRCInterface());
+        //mNRC.pNRC = NRC::NRCInterface::SharedPtr(new NRC::NRCInterface());
+        mNRC.pNRC = NRC::NRCVoxelInterface::SharedPtr(new NRC::NRCVoxelInterface());
         mNRC.pNetwork = mNRC.pNRC->mNetwork;
     }
     if (!mNRC.pTrainingRadianceQuery) {

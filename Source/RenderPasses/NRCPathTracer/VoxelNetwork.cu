@@ -180,6 +180,8 @@ namespace NRC {
         curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(rng, 7272ULL);
         curandSetStream(rng, training_stream);
+
+        
         initializeNetwork();
     }
 
@@ -195,10 +197,17 @@ namespace NRC {
         mMemory = new _Memory();
         cudaHostAlloc((void**)&mCounter, 16, cudaHostAllocDefault);
 
-        //initialize network
-        std::ifstream f(config_path);
-        json config = tcnn::json::parse(f, nullptr, true, true);
+        // parse config initialize network
+        json config = tcnn::json::parse(std::ifstream(config_path), nullptr, true, true);
+        // voxel parameters
+        json voxel_config = config.value("voxel", json::object());
+        json voxel_size = voxel_config.value("size", R"([1,1,1])"_json);
 
+        voxel_param.voxel_size = { voxel_size[0],voxel_size[1],voxel_size[2] };
+        std::cout << "Voxel size set to: [ " << voxel_param.voxel_size[0] << ", "
+            << voxel_param.voxel_size[1] << ", "
+            << voxel_param.voxel_size[2] << " ]" << std::endl;
+        // network parameters
         json net_config = config.value("net", json::object());
         json loss_opts = net_config.value("loss", json::object());
         json optimizer_opts = net_config.value("optimizer", json::object());

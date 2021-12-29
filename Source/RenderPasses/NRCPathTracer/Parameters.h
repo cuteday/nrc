@@ -50,7 +50,10 @@ namespace NRC {
 
         // voxel related settings
         const uint3 voxel_size = { 1, 1, 1 };
-
+        struct VoxelConfig {
+            uint3 voxel_size = { 1, 1, 1 };
+        };
+        extern VoxelConfig voxel_param;
     }
 }
 

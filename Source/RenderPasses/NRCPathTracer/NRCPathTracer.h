@@ -57,8 +57,10 @@ private:
 
     // Neural radiance cache parameters and data fields
     struct {
-        NRC::NRCInterface::SharedPtr pNRC = nullptr;
-        NRC::NRCNetwork::SharedPtr pNetwork = nullptr;
+        //NRC::NRCInterface::SharedPtr pNRC = nullptr;
+        NRC::NRCVoxelInterface::SharedPtr pNRC = nullptr;
+        //NRC::NRCNetwork::SharedPtr pNetwork = nullptr;
+        NRC::VoxelNetwork::SharedPtr pNetwork = nullptr;
 
         bool enableNRC = true;
         bool visualizeNRC = false;
