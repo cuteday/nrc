@@ -32,6 +32,9 @@
     <ClInclude Include="Helpers.h">
       <Filter>NN</Filter>
     </ClInclude>
+    <ClInclude Include="VoxelNetwork.h">
+      <Filter>NN</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ShaderSource Include="Debug\NRCPixelStats.slang">
@@ -75,6 +78,9 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Network.cu">
+      <Filter>NN</Filter>
+    </CudaCompile>
+    <CudaCompile Include="VoxelNetwork.cu">
       <Filter>NN</Filter>
     </CudaCompile>
   </ItemGroup>

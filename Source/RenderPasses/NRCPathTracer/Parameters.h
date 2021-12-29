@@ -15,6 +15,7 @@
 
 namespace NRC {
     using Falcor::uint2;
+    using Falcor::uint3;
 
     namespace Parameters {
 
@@ -46,6 +47,9 @@ namespace NRC {
         const uint32_t output_dim = 3;        // RGB
         //const uint32_t alignment = 16;        // input dim alignment
         const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc_new.json";
+
+        // voxel related settings
+        const uint3 voxel_size = { 1, 1, 1 };
 
     }
 }

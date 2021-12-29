@@ -36,6 +36,7 @@
     <ClInclude Include="NRC.h" />
     <ClInclude Include="NRCPathTracer.h" />
     <ClInclude Include="Parameters.h" />
+    <ClInclude Include="VoxelNetwork.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Falcor\Falcor.vcxproj">
@@ -66,6 +67,7 @@
       <CodeGeneration Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">compute_86,sm_86</CodeGeneration>
       <Defines Condition="'$(Configuration)|$(Platform)'=='Release|x64'">__NVCC__</Defines>
     </CudaCompile>
+    <CudaCompile Include="VoxelNetwork.cu" />
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>

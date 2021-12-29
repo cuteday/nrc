@@ -3,31 +3,35 @@
 #ifndef NRC_MATH_HELPERS
 #define NRC_MATH_HELPERS
 
-__device__ float4 operator * (float4 a, float4 b) {
+/* For non-template functions, an approach to avoid multi-defined symbols is to add inline before function declaration
+   ref https://stackoverflow.com/questions/55259451/multiple-definition-of-cuda-device-functions/55260133 */
+
+
+__device__ inline float4 operator * (float4 a, float4 b) {
     return { a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w };
 }
 
-__device__ float4 operator + (float4 a, float4 b) {
+__device__ inline float4 operator + (float4 a, float4 b) {
     return { a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w };
 }
 
-__device__ float4 operator / (float4 a, float4 b) {
+__device__ inline float4 operator / (float4 a, float4 b) {
     return { a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w };
 }
 
-__device__ float3 operator * (float3 a, float3 b) {
+__device__ inline float3 operator * (float3 a, float3 b) {
     return { a.x * b.x, a.y * b.y, a.z * b.z };
 }
 
-__device__ float3 operator + (float3 a, float3 b) {
+__device__ inline float3 operator + (float3 a, float3 b) {
     return { a.x + b.x, a.y + b.y, a.z + b.z };
 }
 
-__device__ float3 operator / (float3 a, float3 b) {
+__device__ inline float3 operator / (float3 a, float3 b) {
     return { a.x / b.x, a.y / b.y, a.z / b.z };
 }
 
-__device__ float3 safe_div(float3 a, float3 b) {
+__device__ inline float3 safe_div(float3 a, float3 b) {
     float3 res = a / b;
     res.x = isinf(res.x) || isnan(res.x) ? 0 : res.x;
     res.y = isinf(res.y) || isnan(res.y) ? 0 : res.y;
@@ -35,7 +39,7 @@ __device__ float3 safe_div(float3 a, float3 b) {
     return res;
 }
 
-__device__ float4 safe_div(float4 a, float4 b) {
+__device__ inline float4 safe_div(float4 a, float4 b) {
     float4 res = a / b;
     res.x = isinf(res.x) || isnan(res.x) ? 0 : res.x;
     res.y = isinf(res.y) || isnan(res.y) ? 0 : res.y;
@@ -63,4 +67,6 @@ __global__ void trim_cast(uint32_t num_elements, uint32_t stride_in, uint32_t st
     uint32_t elem = i / stride_out;
     data_out[i] = data_in[elem * stride_in + idx];
 }
-#endif // !1
+
+
+#endif // !NRC_MATH_HELPERS
