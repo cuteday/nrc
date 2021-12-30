@@ -97,7 +97,13 @@ struct PathVertexRecord
 //RWStructuredBuffer<RadianceQuery> gVoxelTrainingQuery[];
 //RWStructuredBuffer<RadianceSample> gVoxelTrainingSample[];
 //RWStructuredBuffer<RadianceQuery> gVoxelInferenceQuery[];
-RWStructuredBuffer<uint2> gVoxelInferencePixel[];
+//RWStructuredBuffer<uint2> gVoxelInferencePixel[];
+
+RWStructuredBuffer<RadianceQuery> gTrainingRadianceQuery;
+RWStructuredBuffer<RadianceSample> gTrainingRadianceSample;
+// for self training data, additional radiance info is needed
+RWStructuredBuffer<RadianceQuery> gInferenceRadianceQuery;
+RWStructuredBuffer<uint2> gInferenceRadiancePixel;
 
 // count the numbers of each voxel using atomic operations...
 RWStructuredBuffer<uint> gVoxelInferenceQueryCounter;
@@ -203,6 +209,7 @@ void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
         gInferenceRadiancePixel[index] = gNRCPixel;
     }
     // update voxel inference counter
+    InterlockedAdd(gVoxelInferenceQueryCounter[query.voxel_idx], 1);
 }
 
 uint addTrainingQuery(ShadingData sd)
@@ -211,6 +218,7 @@ uint addTrainingQuery(ShadingData sd)
     RadianceQuery query = generateQuery(sd);
     gTrainingRadianceQuery[idx] = query;
     // update voxel training query counter
+    InterlockedAdd(gVoxelTrainingQueryCounter[query.voxel_idx], 1);
     return idx;
 }
 
@@ -227,7 +235,7 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
     sample.b = b;
     gTrainingRadianceSample[idx] = sample;
     // update voxel training sample counter
-
+    InterlockedAdd(gVoxelTrainingSampleCounter[query.voxel_idx], 1);
 }
 
 /*

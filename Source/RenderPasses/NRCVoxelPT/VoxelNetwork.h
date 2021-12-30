@@ -33,16 +33,15 @@ namespace NRC {
 
         void initializeNetwork(json net_config);
         void reset();
-        float& learningRate() { return learning_rate; };
+        float& learningRate() { return m_learning_rate; };
 
         __host__ void beginFrame(uint32_t* counterBufferDevice);
         __host__ void inference(RadianceQuery* queries, Falcor::uint2* pixels, cudaSurfaceObject_t output);
-        __host__ void train(RadianceQuery* self_queries, uint32_t* self_query_counter,
-            RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss);
+        __host__ void train(RadianceQuery* self_queries, RadianceSample* training_samples, float& loss);
 
     private:
         uint32_t seed = 7272u;
-        float learning_rate = 1e-4f;
+        float m_learning_rate = 1e-4f;
         
     };
 }

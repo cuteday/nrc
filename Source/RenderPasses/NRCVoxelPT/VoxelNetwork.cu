@@ -10,34 +10,26 @@
 #include <curand.h>
 #include <tiny-cuda-nn/config.h>
 #include <tiny-cuda-nn/common.h>
-//#include <tiny-cuda-nn/cute_network_with_input_encoding.h>
 
 using namespace tcnn;
 using precision_t = tcnn::network_precision_t;
 
-#define cell_test 0
-#define cell_count 64
-
-//#define GPUMatrix GPUMatrixDbs
 #define GPUMatrix GPUMatrix<float, CM>
 
 namespace {
     // cuda related
     cudaStream_t inference_stream;
     cudaStream_t training_stream;
+    cudaStream_t *voxel_inference_stream;
+    cudaStream_t *voxel_training_stream;
+
     curandGenerator_t rng;
 
     struct _Network {
-        std::shared_ptr<Loss<precision_t>> loss = nullptr;
-        std::shared_ptr<Optimizer<precision_t>> optimizer = nullptr;
-        std::shared_ptr<NetworkWithInputEncoding<precision_t>> network = nullptr;
-        //std::shared_ptr<CuteNetworkWithInputEncoding<precision_t>> network = nullptr;
-        std::shared_ptr<Trainer<float, precision_t, precision_t>> trainer = nullptr;
-
-        std::shared_ptr<NetworkWithInputEncoding<precision_t>> networkcells[cell_count];
-        std::shared_ptr<Loss<precision_t>> losscells[cell_count];
-        std::shared_ptr<Optimizer<precision_t>> optimizercells[cell_count];
-        std::shared_ptr<Trainer<float, precision_t, precision_t>> trainercells[cell_count];
+        std::vector<std::shared_ptr<NetworkWithInputEncoding<precision_t>>> voxel_network;
+        std::vector<std::shared_ptr<Loss<precision_t>>> voxel_loss;
+        std::vector <std::shared_ptr<Optimizer<precision_t>>> voxel_optimizer;
+        std::vector <std::shared_ptr<Trainer<float, precision_t, precision_t>>> voxel_trainer;
     };
 
     struct _Memory {
@@ -50,18 +42,17 @@ namespace {
         GPUMatrix* training_self_query = nullptr;
         GPUMatrix* training_self_pred = nullptr;
         GPUMemory<float>* random_seq = nullptr;
-
-        GPUMatrix* datacells[cell_count];
-        GPUMatrix* targetcells[cell_count];
     };
 
     struct _Counter {   // pinned memory on device
         uint32_t training_query_count;
         uint32_t training_sample_count;
         uint32_t inference_query_count;
-    };
 
-    cudaStream_t streamcells[cell_count];
+        uint32_t* training_query_counter;
+        uint32_t* training_sample_counter;
+        uint32_t* inference_query_counter;
+    };
 
     _Memory* mMemory;
     _Network* mNetwork;
@@ -151,15 +142,11 @@ namespace NRC {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
         CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
         //training_stream = inference_stream;
-#if cell_test
-        for (int i = 0; i < cell_count; i++)
-            CUDA_CHECK_THROW(cudaStreamCreate(&streamcells[i]));
-#endif
+
         curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-        curandSetPseudoRandomGeneratorSeed(rng, 7272ULL);
+        curandSetPseudoRandomGeneratorSeed(rng, random_seed);
         curandSetStream(rng, training_stream);
 
-        
         initializeNetwork(config);
     }
 
@@ -173,25 +160,33 @@ namespace NRC {
     {
         mNetwork = new _Network();
         mMemory = new _Memory();
-        cudaHostAlloc((void**)&mCounter, 16, cudaHostAllocDefault);
+
+        mNetwork->voxel_network.resize(voxel_param.voxel_num);
+        mNetwork->voxel_loss.resize(voxel_param.voxel_num);
+        mNetwork->voxel_optimizer.resize(voxel_param.voxel_num);
+        mNetwork->voxel_trainer.resize(voxel_param.voxel_num);
+
+        cudaHostAlloc((void**)&mCounter, sizeof(_Counter), cudaHostAllocDefault);
+        cudaHostAlloc(&mCounter->inference_query_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
+        cudaHostAlloc(&mCounter->training_query_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
+        cudaHostAlloc(&mCounter->training_sample_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
 
         // network parameters
         json loss_opts = net_config.value("loss", json::object());
         json optimizer_opts = net_config.value("optimizer", json::object());
         json network_opts = net_config.value("network", json::object());
         json encoding_opts = net_config.value("encoding", json::object());
+        m_learning_rate = optimizer_opts["nested"].value("learning_rate", 1e-3);
 
-        mNetwork->loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts));
-        mNetwork->optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-#if AUX_INPUTS
-        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-        //mNetwork->network = std::make_shared<CuteNetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-#else
-        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-#endif
-        mNetwork->trainer = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork->network, mNetwork->optimizer, mNetwork->loss);
+        for (int i = 0; i < voxel_param.voxel_num; i++) {
+            //auto [loss, optimizer, network, trainer] = create_from_config(input_dim, output_dim, net_config);
+            mNetwork->voxel_loss[i] = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts));
+            mNetwork->voxel_optimizer[i] = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
+            mNetwork->voxel_network[i] = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
+            mNetwork->voxel_trainer[i] = std::make_shared<Trainer<float, precision_t, precision_t>>(
+                mNetwork->voxel_network[i], mNetwork->voxel_optimizer[i], mNetwork->voxel_loss[i]);
+        }
 
-        learning_rate = mNetwork->optimizer->learning_rate();
         mMemory->training_data = new GPUMatrix(input_dim, batch_size);
         mMemory->training_target = new GPUMatrix(output_dim, batch_size);
         mMemory->inference_data = new GPUMatrix(input_dim, resolution);
@@ -202,76 +197,30 @@ namespace NRC {
         mMemory->random_seq = new GPUMemory<float>(n_train_batch * batch_size);
         curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size);
 
-#if cell_test
-        for (int i = 0; i < cell_count; i++) {
-            mNetwork->networkcells[i] = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-            mNetwork->losscells[i] = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts));
-            mNetwork->optimizercells[i] = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-            mNetwork->trainercells[i] = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork->networkcells[i], mNetwork->optimizercells[i], mNetwork->losscells[i]);
-
-            mMemory->datacells[i] = new GPUMatrix(input_dim, next_multiple(resolution / cell_count, 128u));
-            mMemory->targetcells[i] = new GPUMatrix(output_dim, next_multiple(resolution / cell_count, 128u));
-
-        }
-#endif
     }
 
     void VoxelNetwork::reset()
     {
-        CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));
-        CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
-        mNetwork->trainer->initialize_params();
+        CUDA_CHECK_THROW(cudaDeviceSynchronize());
+        for (int i = 0; i < voxel_param.voxel_num; i++)
+            mNetwork->voxel_trainer[i]->initialize_params();
     }
 
     void VoxelNetwork::beginFrame(uint32_t* counterBufferDevice)
     {
-        cudaMemcpy(mCounter, counterBufferDevice, 16, cudaMemcpyDeviceToHost);
-
+        cudaMemcpy(mCounter, counterBufferDevice, sizeof(uint32_t) * 3, cudaMemcpyDeviceToHost);
     }
 
     void VoxelNetwork::inference(RadianceQuery* queries, uint2* pixels, cudaSurfaceObject_t output)
     {
         uint32_t n_elements = mCounter->inference_query_count;
-        uint32_t next_batch_size = next_multiple(n_elements, 128u);
-
-        //std::cout << "#Inference query count: " << mCounter->inference_query_count << std::endl;
-        //std::cout << "#Inference query count: " << n_elements << std::endl;
-        //std::cout << "next batch size: " << next_batch_size << std::endl;
-        //std::cout << "current inference data matrix shape: " << mMemory->inference_data->rows() << "," << mMemory->inference_data->cols() << std::endl;
-        //std::cout << "current inference target matrix shape: " << mMemory->inference_target->rows() << "," << mMemory->inference_target->cols() << std::endl;
-
         if (!n_elements) return;
-        mMemory->inference_data->set_size(input_dim, next_batch_size);
-        mMemory->inference_target->set_size(output_dim, next_batch_size);
 
-        linear_kernel(generateBatchSequential<input_dim>, 0, inference_stream, n_elements,
-            0, queries, mMemory->inference_data->data());
-        mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
-        linear_kernel(mapIndexedRadianceToScreen<float>, 0, inference_stream, n_elements, mMemory->inference_target->data(), output, pixels);
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
     }
 
-    void VoxelNetwork::train(RadianceQuery* self_queries, uint32_t* self_query_counter,
-        RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss)
+    void VoxelNetwork::train(RadianceQuery* self_queries, RadianceSample* training_samples, float& loss)
     {
-        // setup change-able parameters
-        mNetwork->optimizer->set_learning_rate(learning_rate);
-
-        // self query
-        linear_kernel(generateBatchSequential<input_dim>, 0, training_stream, self_query_batch_size,
-            0, self_queries, mMemory->training_self_query->data());
-        mNetwork->network->inference(training_stream, *mMemory->training_self_query, *mMemory->training_self_pred);
-
-        // training
-        // randomly select 4 training batches over all samples
-        curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size);
-        for (uint32_t i = 0; i < n_train_batch; i++) {
-            linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
-                i * batch_size, training_samples, self_queries, mMemory->training_self_pred->data(),
-                mMemory->training_data->data(), mMemory->training_target->data(),
-                training_sample_counter, self_query_counter, mMemory->random_seq->data());
-            mNetwork->trainer->training_step(training_stream, *mMemory->training_data, *mMemory->training_target, &loss);
-        }
         CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));
     }
 }

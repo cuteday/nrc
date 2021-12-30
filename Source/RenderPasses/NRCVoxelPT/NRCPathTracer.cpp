@@ -8,8 +8,8 @@ namespace
 {
     using namespace NRC;
 
-    const char kShaderFile[] = "RenderPasses/NRCPathTracer/PathTracer.rt.slang";
-    const char kCompositeShaderFile[] = "RenderPasses/NRCPathTracer/Composite.cs.slang";
+    const char kShaderFile[] = "RenderPasses/NRCVoxelPT/PathTracer.rt.slang";
+    const char kCompositeShaderFile[] = "RenderPasses/NRCVoxelPT/Composite.cs.slang";
     const char kParameterBlockName[] = "gData";
 
     // Ray tracing settings that affect the traversal stack size.
@@ -55,7 +55,7 @@ extern "C" __declspec(dllexport) const char* getProjDir()
 
 extern "C" __declspec(dllexport) void getPasses(Falcor::RenderPassLibrary& lib)
 {
-    lib.registerClass("NRCPathTracer", NRCPathTracer::sDesc, NRCPathTracer::create);
+    lib.registerClass("NRCVoxelPT", NRCPathTracer::sDesc, NRCPathTracer::create);
 }
 
 NRCPathTracer::SharedPtr NRCPathTracer::create(RenderContext* pRenderContext, const Dictionary& dict)
@@ -158,6 +158,11 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceQuery, 0);
     pRenderContext->clearUAVCounter(mNRC.pTrainingRadianceSample, 0);
     pRenderContext->clearUAVCounter(mNRC.pInferenceRadianceQuery, 0);
+
+    pRenderContext->clearUAV(mNRCVoxel.pInferenceQueryCounter->getUAV().get(), uint4(0));
+    pRenderContext->clearUAV(mNRCVoxel.pTrainingQueryCounter->getUAV().get(), uint4(0));
+    pRenderContext->clearUAV(mNRCVoxel.pTrainingSampleCounter->getUAV().get(), uint4(0));
+
     mTracer.pNRCPixelStats->beginFrame(pRenderContext, renderData.getDefaultTextureDims());
     return state;
 }
@@ -437,10 +442,15 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["gScreenQueryFactor"] = mScreen.pScreenQueryFactor;
     pVars["gScreenQueryBias"] = mScreen.pScreenQueryBias;
     pVars["gScreenQueryReflectance"] = mScreen.pScreenQueryReflectance;
+
     pVars["gInferenceRadianceQuery"] = mNRC.pInferenceRadianceQuery;
     pVars["gInferenceRadiancePixel"] = mNRC.pInferenceRadiancePixel;
     pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
     pVars["gTrainingRadianceSample"] = mNRC.pTrainingRadianceSample;
+
+    pVars["gVoxelInferenceQueryCounter"] = mNRCVoxel.pInferenceQueryCounter;
+    pVars["gVoxelTrainingSampleCounter"] = mNRCVoxel.pTrainingSampleCounter;
+    pVars["gVoxelTrainingQueryCounter"] = mNRCVoxel.pTrainingQueryCounter;
 
     mCompositePass["CompositeCB"]["gVisualizeMode"] = mNRC.visualizeMode;
     mCompositePass["CompositeCB"]["gReflectanceFact"] = (bool)REFLECTANCE_FACT;

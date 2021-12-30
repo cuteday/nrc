@@ -14,10 +14,6 @@
 using namespace tcnn;
 using precision_t = tcnn::network_precision_t;
 
-#define cell_test 0
-#define cell_count 64
-
-//#define GPUMatrix GPUMatrixDbs
 #define GPUMatrix GPUMatrix<float, CM>
 
 namespace {
@@ -32,11 +28,6 @@ namespace {
         std::shared_ptr<NetworkWithInputEncoding<precision_t>> network = nullptr;
         //std::shared_ptr<CuteNetworkWithInputEncoding<precision_t>> network = nullptr;
         std::shared_ptr<Trainer<float, precision_t, precision_t>> trainer = nullptr;
-
-        std::shared_ptr<NetworkWithInputEncoding<precision_t>> networkcells[cell_count];
-        std::shared_ptr<Loss<precision_t>> losscells[cell_count];
-        std::shared_ptr<Optimizer<precision_t>> optimizercells[cell_count];
-        std::shared_ptr<Trainer<float, precision_t, precision_t>> trainercells[cell_count];
     };
 
     struct _Memory {
@@ -49,9 +40,6 @@ namespace {
         GPUMatrix* training_self_query = nullptr;
         GPUMatrix* training_self_pred = nullptr;
         GPUMemory<float>* random_seq = nullptr;
-
-        GPUMatrix* datacells[cell_count];
-        GPUMatrix* targetcells[cell_count];
     };
 
     struct _Counter {   // pinned memory on device
@@ -59,8 +47,6 @@ namespace {
         uint32_t training_sample_count;
         uint32_t inference_query_count;
     };
-
-    cudaStream_t streamcells[cell_count];
 
     _Memory* mMemory;
     _Network* mNetwork;
@@ -206,12 +192,7 @@ namespace NRC {
 
         mNetwork->loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
         mNetwork->optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-#if AUX_INPUTS
         mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-        //mNetwork->network = std::make_shared<CuteNetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-#else
-        mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-#endif
         mNetwork->trainer = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork->network, mNetwork->optimizer, mNetwork->loss);
 
         learning_rate = mNetwork->optimizer->learning_rate();
@@ -224,19 +205,6 @@ namespace NRC {
 
         mMemory->random_seq = new GPUMemory<float>(n_train_batch * batch_size);
         curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size);
-
-#if cell_test
-        for (int i = 0; i < cell_count; i++) {
-            mNetwork->networkcells[i] = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
-            mNetwork->losscells[i] = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts));
-            mNetwork->optimizercells[i] = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-            mNetwork->trainercells[i] = std::make_shared<Trainer<float, precision_t, precision_t>>(mNetwork->networkcells[i], mNetwork->optimizercells[i], mNetwork->losscells[i]);
-
-            mMemory->datacells[i] = new GPUMatrix(input_dim, next_multiple(resolution / cell_count, 128u));
-            mMemory->targetcells[i] = new GPUMatrix(output_dim, next_multiple(resolution / cell_count, 128u));
-
-        }
-#endif
     }
 
     void NRCNetwork::reset()
@@ -289,13 +257,6 @@ namespace NRC {
         //linear_kernel(mapIndexedRadianceToScreen<float>, 0, inference_stream, n_elements, mMemory->inference_target->data(), output, nullptr);
 
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
-
-#if cell_test
-        for (int i = 0; i < cell_count; i++)
-            mNetwork->networkcells[i]->inference(streamcells[i], *mMemory->datacells[i], *mMemory->targetcells[i]);
-        for (int i = 0; i < cell_count; i++)
-            cudaStreamSynchronize(streamcells[i]);
-#endif
     }
 
     void NRCNetwork::train(RadianceQuery* self_queries, uint32_t* self_query_counter,

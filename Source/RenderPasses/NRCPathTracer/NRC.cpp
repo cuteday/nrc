@@ -23,8 +23,6 @@ namespace NRC {
     void NRCInterface::trainFrame()
     {
         float loss;
-        /*mNetwork->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
-            mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);*/
         mNetwork->train(mFalcorResources.trainingQuery, mFalcorResources.trainingQueryCounter,
             mFalcorResources.trainingSample, mFalcorResources.trainingSampleCounter, loss);
         mStats.n_frames++;
@@ -37,8 +35,6 @@ namespace NRC {
 
     void NRCInterface::inferenceFrame()
     {
-        //mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
-        //    mParameters.screenSize.x, mParameters.screenSize.y);
         mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.inferenceQueryPixel, mFalcorResources.screenResult);
     }
 

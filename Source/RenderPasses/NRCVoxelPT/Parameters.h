@@ -34,6 +34,8 @@ namespace NRC {
         const unsigned int max_inference_query_size = resolution;
         const unsigned int max_training_query_size = 1 << 16;                   // ~57,600
 
+        const unsigned long long random_seed = 7272ULL; 
+
         const uint2 trainingPathStrideRR = trainingPathStride * 4u;
 
         const unsigned int max_training_sample_size = resolution / trainingPathStride.x / trainingPathStride.y * 15;
@@ -46,13 +48,14 @@ namespace NRC {
 #endif
         const uint32_t output_dim = 3;        // RGB
         //const uint32_t alignment = 16;        // input dim alignment
-        const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc_new.json";
+        const std::string config_path = "../RenderPasses/NRCVoxelPT/Data/default_nrc_new.json";
 
         // voxel related settings
         const uint32_t max_training_sample_voxel = 1 << 16;
         const uint32_t max_inference_query_voxel = resolution;
         struct VoxelConfig {
             uint3 voxel_size = { 1, 1, 1 };
+            unsigned int voxel_num = 1;
         };
         extern VoxelConfig voxel_param;
     }
