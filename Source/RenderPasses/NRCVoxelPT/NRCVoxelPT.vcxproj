@@ -11,11 +11,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{41396634-80A2-449C-B2F5-7E97624E42D3}</ProjectGuid>
+    <ProjectGuid>{9FA3E105-6DE0-4071-913F-A916CD964116}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>NRCPathTracer</RootNamespace>
+    <RootNamespace>NRCVoxelPT</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>NRCPathTracer</ProjectName>
+    <ProjectName>NRCVoxelPT</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -36,6 +36,7 @@
     <ClInclude Include="NRC.h" />
     <ClInclude Include="NRCPathTracer.h" />
     <ClInclude Include="Parameters.h" />
+    <ClInclude Include="VoxelNetwork.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Falcor\Falcor.vcxproj">
@@ -52,6 +53,7 @@
     <ShaderSource Include="Debug\NRCPixelStatsShared.slang" />
     <ShaderSource Include="NRC.slang" />
     <ShaderSource Include="NRCPathTracer.slang" />
+    <ShaderSource Include="NRCVoxel.slang" />
     <ShaderSource Include="PathTracer.rt.slang" />
     <ShaderSource Include="PathTracer.slang" />
   </ItemGroup>
@@ -66,6 +68,7 @@
       <CodeGeneration Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">compute_86,sm_86</CodeGeneration>
       <Defines Condition="'$(Configuration)|$(Platform)'=='Release|x64'">__NVCC__</Defines>
     </CudaCompile>
+    <CudaCompile Include="VoxelNetwork.cu" />
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -132,7 +135,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4819;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(SolutionDir)Source\tiny-cuda-nn\dependencies;$(SolutionDir)Source\tiny-cuda-nn\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>

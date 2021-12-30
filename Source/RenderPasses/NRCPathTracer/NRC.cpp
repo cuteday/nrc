@@ -3,19 +3,15 @@
 
 using namespace Falcor;
 
-namespace NRC::Parameters {
-    VoxelConfig voxel_param;
-    
-}
-
 namespace NRC {
-    NRCInterface::NRCInterface() {
+
+    NRCInterface::NRCInterface(){
         if (!FalcorCUDA::initCUDA()) {
             Falcor::logFatal("Cuda init failed");
             return;
         }
         logInfo("NRCInterface::working directory: " + std::filesystem::current_path().string());
-        logInfo("NRCInterface::creating and initializing network");
+        logInfo("NRCInferface::creating and initializing network");
         mNetwork = NRCNetwork::SharedPtr(new NRCNetwork());
     }
 
@@ -54,58 +50,6 @@ namespace NRC {
     }
 
     void NRCInterface::resetParameters()
-    {
-        mNetwork->reset();
-    }
-}
-
-namespace NRC {
-
-    NRCVoxelInterface::NRCVoxelInterface() {
-        if (!FalcorCUDA::initCUDA()) {
-            Falcor::logFatal("Cuda init failed");
-            return;
-        }
-        logInfo("NRCVoxelInterface::working directory: " + std::filesystem::current_path().string());
-        logInfo("NRCVoxelInterface::creating and initializing network");
-        mNetwork = VoxelNetwork::SharedPtr(new VoxelNetwork());
-    }
-
-    void NRCVoxelInterface::beginFrame()
-    {
-        mNetwork->beginFrame(mFalcorResources.counterBufferPtr);
-    }
-
-    void NRCVoxelInterface::trainFrame()
-    {
-        float loss;
-        /*mNetwork->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
-            mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);*/
-        mNetwork->train(mFalcorResources.trainingQuery, mFalcorResources.trainingQueryCounter,
-            mFalcorResources.trainingSample, mFalcorResources.trainingSampleCounter, loss);
-        mStats.n_frames++;
-        mStats.training_loss_avg = mStats.ema_factor * mStats.training_loss_avg + (1 - mStats.ema_factor) * loss;
-
-        if (mStats.n_frames % mStats.print_every == 0) {
-            printStats();
-        }
-    }
-
-    void NRCVoxelInterface::inferenceFrame()
-    {
-        //mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
-        //    mParameters.screenSize.x, mParameters.screenSize.y);
-        mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.inferenceQueryPixel, mFalcorResources.screenResult);
-    }
-
-    void NRCVoxelInterface::printStats()
-    {
-        std::stringstream ss;
-        ss << "Current frame: " << mStats.n_frames << "loss: " << mStats.training_loss_avg;
-        Falcor::logInfo(ss.str());
-    }
-
-    void NRCVoxelInterface::resetParameters()
     {
         mNetwork->reset();
     }

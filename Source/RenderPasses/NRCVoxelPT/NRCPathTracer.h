@@ -1,7 +1,8 @@
 #pragma once
+
+#include "NRC.h"
 #include "Falcor.h"
 #include "RenderPasses/Shared/PathTracer/PathTracer.h"
-#include "NRC.h"
 #include "Debug/NRCPixelStats.h"
 
 using namespace Falcor;
@@ -57,8 +58,10 @@ private:
 
     // Neural radiance cache parameters and data fields
     struct {
-        NRC::NRCInterface::SharedPtr pNRC = nullptr;
-        NRC::NRCNetwork::SharedPtr pNetwork = nullptr;
+        //NRC::NRCInterface::SharedPtr pNRC = nullptr;
+        NRC::NRCVoxelInterface::SharedPtr pNRC = nullptr;
+        //NRC::NRCNetwork::SharedPtr pNetwork = nullptr;
+        NRC::VoxelNetwork::SharedPtr pNetwork = nullptr;
 
         bool enableNRC = true;
         bool visualizeNRC = false;
@@ -76,12 +79,28 @@ private:
         Buffer::SharedPtr pInferenceRadianceQuery = nullptr;
         Buffer::SharedPtr pInferenceRadiancePixel = nullptr;
         Buffer::SharedPtr pSharedCounterBuffer = nullptr;
+    } mNRC;
+
+    struct {
+        // voxel related
+        uint nVoxels = 0;
+
+        Buffer::SharedPtr* pTrainingQueryVoxel = nullptr;
+        Buffer::SharedPtr* pTrainingSampleVoxel = nullptr;
+        Buffer::SharedPtr* pInferenceQueryVoxel = nullptr;
+        Buffer::SharedPtr* pInferencePixelVoxel = nullptr;
+
+        Buffer::SharedPtr pInferenceQueryCounter = nullptr;
+        Buffer::SharedPtr pTrainingSampleCounter = nullptr;
+        Buffer::SharedPtr pTrainingQueryCounter = nullptr;
+    } mNRCVoxel;
+
+    struct {
         Texture::SharedPtr pScreenQueryFactor = nullptr;
         Texture::SharedPtr pScreenQueryBias = nullptr;
         Texture::SharedPtr pScreenQueryReflectance = nullptr;
         Texture::SharedPtr pScreenResult = nullptr;
-
-    } mNRC;
+    } mScreen;
 
     bool mNRCOptionChanged = true;
     ComputePass::SharedPtr mCompositePass;

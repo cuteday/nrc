@@ -9,12 +9,14 @@
 #ifndef NRC_PARAMETERS
 #define NRC_PARAMETERS
 
+#define NRC_VOXEL           1
 #define AUX_INPUTS          1
 #define REFLECTANCE_FACT    1
 #define LITE_SCREEN         0
 
 namespace NRC {
     using Falcor::uint2;
+    using Falcor::uint3;
 
     namespace Parameters {
 
@@ -47,6 +49,13 @@ namespace NRC {
         //const uint32_t alignment = 16;        // input dim alignment
         const std::string config_path = "../RenderPasses/NRCPathTracer/Data/default_nrc_new.json";
 
+        // voxel related settings
+        const uint32_t max_training_sample_voxel = 1 << 16;
+        const uint32_t max_inference_query_voxel = resolution;
+        struct VoxelConfig {
+            uint3 voxel_size = { 1, 1, 1 };
+        };
+        extern VoxelConfig voxel_param;
     }
 }
 

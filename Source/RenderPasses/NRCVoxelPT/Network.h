@@ -6,22 +6,26 @@
 #include <string>
 #include <memory>
 #include <fstream>
+#ifdef __NVCC__
+#define NRC_CALLABLE __host__ __device__
+#else
+#define NRC_CALLABLE
+#endif
 
 #include "DataStructure.slang"
 
 namespace NRC {
 
 
-
-    class VoxelNetwork {
+    class NRCNetwork {
 
     public:
-        using SharedPtr = std::shared_ptr<VoxelNetwork>;
-        using WeakPtr = std::weak_ptr<VoxelNetwork>;
-        using SharedConstPtr = std::shared_ptr<const VoxelNetwork>;
+        using SharedPtr = std::shared_ptr<NRCNetwork>;
+        using WeakPtr = std::weak_ptr<NRCNetwork>;
+        using SharedConstPtr = std::shared_ptr<const NRCNetwork>;
 
-        VoxelNetwork();
-        ~VoxelNetwork();
+        NRCNetwork();
+        ~NRCNetwork();
 
         void initializeNetwork();
         void reset();
@@ -36,7 +40,6 @@ namespace NRC {
     private:
         uint32_t seed = 7272u;
         float learning_rate = 1e-4f;
-        
     };
 }
 

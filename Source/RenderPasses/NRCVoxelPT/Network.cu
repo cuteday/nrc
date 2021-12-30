@@ -2,7 +2,7 @@
 #define __NVCC__
 #endif
 
-#include "VoxelNetwork.h"
+#include "Network.h"
 #include "Helpers.h"
 #include "Parameters.h"
 
@@ -26,7 +26,7 @@ namespace {
     cudaStream_t training_stream;
     curandGenerator_t rng;
 
-    struct _Network {
+    struct _Network { 
         std::shared_ptr<Loss<precision_t>> loss = nullptr;
         std::shared_ptr<Optimizer<precision_t>> optimizer = nullptr;
         std::shared_ptr<NetworkWithInputEncoding<precision_t>> network = nullptr;
@@ -70,7 +70,7 @@ namespace {
 template <typename T>
 __device__ void copyQuery(T* data, const NRC::RadianceQuery* query) {
     // use naive copy kernel since memcpy has bad performance on small datas.
-
+    
     data[0] = query->pos.x, data[1] = query->pos.y, data[2] = query->pos.z;
     data[3] = query->dir.x, data[4] = query->dir.y;
 #if AUX_INPUTS
@@ -86,7 +86,7 @@ __device__ void copyQuery(T* data, const NRC::RadianceQuery* query) {
 // reference linear_kernel() for details.
 // stride: input dim
 template <uint32_t stride, typename T = float>
-__global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
+__global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset, 
     NRC::RadianceQuery* queries, T* data) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset < n_elements) {
@@ -98,12 +98,12 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
 template <uint32_t stride, typename T = float>
 __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
     NRC::RadianceSample* samples, NRC::RadianceQuery* self_queries, T* self_query_pred,
-    T* training_data, T* training_target, uint32_t* training_sample_counter, uint32_t* self_query_counter,
+    T* training_data, T* training_target, uint32_t* training_sample_counter, uint32_t* self_query_counter, 
     float* random_indices = nullptr) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i + offset > n_elements) return;
     int data_index = i * stride, sample_index = i + offset;
-    if (random_indices)
+    if (random_indices) 
         sample_index = (1 - random_indices[sample_index]) * *training_sample_counter;
 
     int pred_index = samples[sample_index].idx; // pred_index == -1 if a self-query is not needed.
@@ -121,18 +121,18 @@ __global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t of
         float3 reflectance = samples[sample_index].query.diffuse + samples[sample_index].query.specular;
         if (pred_index >= 0)
             // restore self-query from reflectance factorization...
-            pred_radiance = pred_radiance * (self_queries[pred_index].diffuse + self_queries[pred_index].specular);
+            pred_radiance = pred_radiance * (self_queries[pred_index].diffuse + self_queries[pred_index].specular); 
         float3 radiance = safe_div(pred_radiance * factor + bias, reflectance);
 #else
         float3 radiance = pred_radiance * factor + bias;
 #endif
-        * (float3*)&training_target[output_index] = radiance;
+        *(float3*)&training_target[output_index] = radiance;
     }
 }
 
 template <typename T = float>
 __global__ void mapPredRadianceToScreen(uint32_t n_elements, uint32_t width,
-    T* data, cudaSurfaceObject_t output) {
+     T* data, cudaSurfaceObject_t output) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t x = i % width, y = i / width;
     uint32_t index = i * 3;
@@ -148,7 +148,7 @@ __global__ void mapPredRadianceToScreen2(T* data, cudaSurfaceObject_t output,
     if (x < width && y < height) {
         uint32_t index = y * width + x;
         uint32_t data_index = index * 3;
-        float4 radiance = { data[data_index + 0], data[data_index + 1], data[data_index + 2], 1.0f };
+        float4 radiance = { data[data_index + 0], data[data_index + 1], data[data_index + 2], 1.0f};
         surf2Dwrite(radiance, output, (int)sizeof(float4) * x, y);
     }
 }
@@ -158,7 +158,7 @@ __global__ void mapIndexedRadianceToScreen(uint32_t n_elements, T* data,
     cudaSurfaceObject_t output, Falcor::uint2* pixels) {
     uint32_t i = threadIdx.x + blockDim.x * blockIdx.x;
     if (i > n_elements) return;
-    uint32_t px = pixels[i].x, py = pixels[i].y;
+    uint32_t px = pixels[i].x, py= pixels[i].y;
     uint32_t data_index = i * 3;
     float4 radiance = { data[data_index], data[data_index + 1], data[data_index + 2], 1.0f };
     surf2Dwrite(radiance, output, (int)sizeof(float4) * px, py);
@@ -168,7 +168,7 @@ __global__ void mapIndexedRadianceToScreen(uint32_t n_elements, T* data,
 using namespace NRC::Parameters;
 
 namespace NRC {
-    VoxelNetwork::VoxelNetwork()
+    NRCNetwork::NRCNetwork()
     {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
         CUDA_CHECK_THROW(cudaStreamCreate(&training_stream));
@@ -180,41 +180,32 @@ namespace NRC {
         curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(rng, 7272ULL);
         curandSetStream(rng, training_stream);
-
-        
         initializeNetwork();
     }
 
-    VoxelNetwork::~VoxelNetwork()
+    NRCNetwork::~NRCNetwork()
     {
         delete mNetwork;
         delete mMemory;
     }
 
-    void VoxelNetwork::initializeNetwork()
+    void NRCNetwork::initializeNetwork()
     {
         mNetwork = new _Network();
         mMemory = new _Memory();
         cudaHostAlloc((void**)&mCounter, 16, cudaHostAllocDefault);
 
-        // parse config initialize network
-        json config = tcnn::json::parse(std::ifstream(config_path), nullptr, true, true);
-        // voxel parameters
-        json voxel_config = config.value("voxel", json::object());
-        json voxel_size = voxel_config.value("size", R"([1,1,1])"_json);
+        //initialize network
+        std::ifstream f(config_path);
+        json config = tcnn::json::parse(f, nullptr, true, true);
 
-        voxel_param.voxel_size = { voxel_size[0],voxel_size[1],voxel_size[2] };
-        std::cout << "Voxel size set to: [ " << voxel_param.voxel_size[0] << ", "
-            << voxel_param.voxel_size[1] << ", "
-            << voxel_param.voxel_size[2] << " ]" << std::endl;
-        // network parameters
         json net_config = config.value("net", json::object());
         json loss_opts = net_config.value("loss", json::object());
         json optimizer_opts = net_config.value("optimizer", json::object());
         json network_opts = net_config.value("network", json::object());
         json encoding_opts = net_config.value("encoding", json::object());
 
-        mNetwork->loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts));
+        mNetwork->loss = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts) );
         mNetwork->optimizer = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
 #if AUX_INPUTS
         mNetwork->network = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
@@ -249,29 +240,23 @@ namespace NRC {
 #endif
     }
 
-    void VoxelNetwork::reset()
+    void NRCNetwork::reset()
     {
         CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
         mNetwork->trainer->initialize_params();
     }
 
-    void VoxelNetwork::beginFrame(uint32_t* counterBufferDevice)
+    void NRCNetwork::beginFrame(uint32_t* counterBufferDevice)
     {
         cudaMemcpy(mCounter, counterBufferDevice, 16, cudaMemcpyDeviceToHost);
-
+        
     }
 
-    void VoxelNetwork::inference(RadianceQuery* queries, uint2* pixels, cudaSurfaceObject_t output)
+    void NRCNetwork::inference(RadianceQuery* queries, uint2* pixels, cudaSurfaceObject_t output)
     {
         uint32_t n_elements = mCounter->inference_query_count;
         uint32_t next_batch_size = next_multiple(n_elements, 128u);
-
-        //std::cout << "#Inference query count: " << mCounter->inference_query_count << std::endl;
-        //std::cout << "#Inference query count: " << n_elements << std::endl;
-        //std::cout << "next batch size: " << next_batch_size << std::endl;
-        //std::cout << "current inference data matrix shape: " << mMemory->inference_data->rows() << "," << mMemory->inference_data->cols() << std::endl;
-        //std::cout << "current inference target matrix shape: " << mMemory->inference_target->rows() << "," << mMemory->inference_target->cols() << std::endl;
 
         if (!n_elements) return;
         mMemory->inference_data->set_size(input_dim, next_batch_size);
@@ -284,7 +269,7 @@ namespace NRC {
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
     }
 
-    void VoxelNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,
+    void NRCNetwork::inference(RadianceQuery* queries, cudaSurfaceObject_t output,
         uint32_t width, uint32_t height)
     {
         uint32_t n_elements = width * height;
@@ -292,14 +277,14 @@ namespace NRC {
         // this input generation process takes about ~1ms.
         linear_kernel(generateBatchSequential<input_dim>, 0, inference_stream, n_elements,
             0, queries, mMemory->inference_data->data());
-
+        
         mNetwork->network->inference(inference_stream, *mMemory->inference_data, *mMemory->inference_target);
 
         // map method #1:
         //linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
         // map method #2:
         dim3 dimBlock(16, 16), dimGrid(div_round_up(width, 16u), div_round_up(height, 16u));
-        mapPredRadianceToScreen2<float> << <dimGrid, dimBlock, 0, inference_stream >> >
+        mapPredRadianceToScreen2<float> <<<dimGrid, dimBlock, 0, inference_stream >>>
             (mMemory->inference_target->data(), output, width, height);
         // indexed mapping:
         //linear_kernel(mapIndexedRadianceToScreen<float>, 0, inference_stream, n_elements, mMemory->inference_target->data(), output, nullptr);
@@ -314,7 +299,7 @@ namespace NRC {
 #endif
     }
 
-    void VoxelNetwork::train(RadianceQuery* self_queries, uint32_t* self_query_counter,
+    void NRCNetwork::train(RadianceQuery* self_queries, uint32_t* self_query_counter,
         RadianceSample* training_samples, uint32_t* training_sample_counter, float& loss)
     {
         // setup change-able parameters

@@ -81,9 +81,11 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     bool state = PathTracer::beginFrame(pRenderContext, renderData);
     if (!state) return false;
     if (!mNRC.pNRC) {
-        mNRC.pNRC = NRC::NRCInterface::SharedPtr(new NRC::NRCInterface());
+        //mNRC.pNRC = NRC::NRCInterface::SharedPtr(new NRC::NRCInterface());
+        mNRC.pNRC = NRC::NRCVoxelInterface::SharedPtr(new NRC::NRCVoxelInterface());
         mNRC.pNetwork = mNRC.pNRC->mNetwork;
     }
+
     if (!mNRC.pTrainingRadianceQuery) {
         /* there are 3 ways to create a structured buffer shader resource */
         //mNRC.pSample = Buffer::createStructured(mTracer.pProgram.get(), "gSample", 2000);
@@ -108,18 +110,33 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             throw std::runtime_error("Structure buffer size mismatch: inference pixel");
     }
 
-    if (!mNRC.pScreenQueryBias || mNRC.pScreenQueryBias->getWidth() != targetDim.x || mNRC.pScreenQueryBias->getHeight() != targetDim.y) {
-        mNRC.pScreenQueryBias = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+    if (!mNRCVoxel.pInferenceQueryVoxel) {
+        uint3 voxel_size = Parameters::voxel_param.voxel_size;
+        uint num_voxels = voxel_size.x * voxel_size.y * voxel_size.z;
+        mNRCVoxel.nVoxels = num_voxels;
+
+        //mNRCVoxel.pInferencePixelVoxel = new Buffer::SharedPtr[num_voxels];
+        //mNRCVoxel.pInferenceQueryVoxel = new Buffer::SharedPtr[num_voxels];
+        //mNRCVoxel.pTrainingQueryVoxel = new Buffer::SharedPtr[num_voxels];
+        //mNRCVoxel.pTrainingSampleVoxel = new Buffer::SharedPtr[num_voxels];
+        //for (int i = 0; i < num_voxels; i++) {
+        //    mNRCVoxel.pInferencePixelVoxel[i] = Buffer::createStructured(sizeof(uint2), Parameters::max_training_sample_voxel, 
+        //        Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
+        //}
+    }
+
+    if (!mScreen.pScreenQueryBias || mScreen.pScreenQueryBias->getWidth() != targetDim.x || mScreen.pScreenQueryBias->getHeight() != targetDim.y) {
+        mScreen.pScreenQueryBias = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
-        mNRC.pScreenQueryFactor = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+        mScreen.pScreenQueryFactor = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
-        mNRC.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+        mScreen.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
-        mNRC.pScreenQueryReflectance = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
+        mScreen.pScreenQueryReflectance = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
 
         // also register these resource to NRCInterface again
-        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadianceQuery, mNRC.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
+        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadianceQuery, mScreen.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
             mNRC.pSharedCounterBuffer);
         mNRC.pNRC->mFalcorResources.inferenceQueryPixel = (uint2*)mNRC.pInferenceRadiancePixel->getCUDADeviceAddress();
 
@@ -408,9 +425,9 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gSceneAABBExtent"] = mpScene->getSceneBounds().extent();
 
     // set textures & buffers (defined in NrC.slang)
-    pVars["gScreenQueryFactor"] = mNRC.pScreenQueryFactor;
-    pVars["gScreenQueryBias"] = mNRC.pScreenQueryBias;
-    pVars["gScreenQueryReflectance"] = mNRC.pScreenQueryReflectance;
+    pVars["gScreenQueryFactor"] = mScreen.pScreenQueryFactor;
+    pVars["gScreenQueryBias"] = mScreen.pScreenQueryBias;
+    pVars["gScreenQueryReflectance"] = mScreen.pScreenQueryReflectance;
     pVars["gInferenceRadianceQuery"] = mNRC.pInferenceRadianceQuery;
     pVars["gInferenceRadiancePixel"] = mNRC.pInferenceRadiancePixel;
     pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
@@ -418,9 +435,9 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
 
     mCompositePass["CompositeCB"]["gVisualizeMode"] = mNRC.visualizeMode;
     mCompositePass["CompositeCB"]["gReflectanceFact"] = (bool)REFLECTANCE_FACT;
-    mCompositePass["factor"] = mNRC.pScreenQueryFactor;
-    mCompositePass["bias"] = mNRC.pScreenQueryBias;
-    mCompositePass["radiance"] = mNRC.pScreenResult;
-    mCompositePass["reflectance"] = mNRC.pScreenQueryReflectance;
+    mCompositePass["factor"] = mScreen.pScreenQueryFactor;
+    mCompositePass["bias"] = mScreen.pScreenQueryBias;
+    mCompositePass["radiance"] = mScreen.pScreenResult;
+    mCompositePass["reflectance"] = mScreen.pScreenQueryReflectance;
     mCompositePass["output"] = renderData[kNRCResultOutput]->asTexture();
 }
