@@ -123,6 +123,14 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
         //    mNRCVoxel.pInferencePixelVoxel[i] = Buffer::createStructured(sizeof(uint2), Parameters::max_training_sample_voxel, 
         //        Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         //}
+
+        // initialize counters!
+        mNRCVoxel.pInferenceQueryCounter = Buffer::createStructured(sizeof(uint), num_voxels,
+            Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
+        mNRCVoxel.pTrainingQueryCounter = Buffer::createStructured(sizeof(uint), num_voxels,
+            Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
+        mNRCVoxel.pTrainingSampleCounter = Buffer::createStructured(sizeof(uint), num_voxels,
+            Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
     }
 
     if (!mScreen.pScreenQueryBias || mScreen.pScreenQueryBias->getWidth() != targetDim.x || mScreen.pScreenQueryBias->getHeight() != targetDim.y) {
@@ -423,7 +431,8 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     // scene AABB for normalizing coordinates
     pVars["NRCDataCB"]["gSceneAABBCenter"] = mpScene->getSceneBounds().center();
     pVars["NRCDataCB"]["gSceneAABBExtent"] = mpScene->getSceneBounds().extent();
-
+    // voxel related parameters
+    pVars["VoxelDataCB"]["gVoxelSize"] = Parameters::voxel_param.voxel_size;
     // set textures & buffers (defined in NrC.slang)
     pVars["gScreenQueryFactor"] = mScreen.pScreenQueryFactor;
     pVars["gScreenQueryBias"] = mScreen.pScreenQueryBias;

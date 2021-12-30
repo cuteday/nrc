@@ -26,10 +26,11 @@ BEGIN_NAMESPACE_NRC
     {
         RadianceQuery query;
         // L_o (scattered radiance) = a * L_i + b
-        int idx;    // which query it belongs to?
+        int idx;    // which self-query it contains?
         float3 a;   // factor of scatter ray (bsdf sample)
         float3 b;   // the direct sample part
-        int voxel_idx;
+        float _pad0;
+        //int voxel_idx;
     };
 
     enum class NRCVisualizeMode {

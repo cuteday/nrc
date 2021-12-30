@@ -9,7 +9,7 @@
 #include "Utils/Math/MathConstants.slangh"
 
 __exported import PathTracer;
-__exported import NRC;
+__exported import NRCVoxel;
 __exported import Debug.NRCPixelStats;
 
 // records on vertices of a path, for tracing back scattering radiance of each vertex.

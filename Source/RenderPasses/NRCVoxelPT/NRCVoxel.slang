@@ -94,10 +94,10 @@ struct PathVertexRecord
 
 // for RR training data, no radiance info is needed
 // for self training data, additional radiance info is needed
-/*RWStructuredBuffer<RadianceQuery> gVoxelTrainingQuery[];
-RWStructuredBuffer<RadianceSample> gVoxelTrainingSample[];
-RWStructuredBuffer<RadianceQuery> gVoxelInferenceQuery[];
-RWStructuredBuffer<uint2> gVoxelInferencePixel[];*/
+//RWStructuredBuffer<RadianceQuery> gVoxelTrainingQuery[];
+//RWStructuredBuffer<RadianceSample> gVoxelTrainingSample[];
+//RWStructuredBuffer<RadianceQuery> gVoxelInferenceQuery[];
+RWStructuredBuffer<uint2> gVoxelInferencePixel[];
 
 // count the numbers of each voxel using atomic operations...
 RWStructuredBuffer<uint> gVoxelInferenceQueryCounter;
@@ -113,6 +113,19 @@ RWTexture2D<float4> gOutputResult;
 float3 normalizeCoord(float3 x)
 {
     return (x - gSceneAABBCenter) * 2 / gSceneAABBExtent;
+}
+
+int flattenVoxelIndex(uint3 voxel)
+{
+    return voxel.z + gVoxelSize.z * voxel.y + gVoxelSize.y * gVoxelSize.z * voxel.x;
+}
+
+// get flattened voxel index from normalized global coordinate
+int getVoxelIndex(float3 coord)
+{
+    float3 voxel_stride = float3(2) / gVoxelSize;
+    uint3 voxel_index = uint3((coord - float3(-1)) / voxel_stride);
+    return flattenVoxelIndex(voxel_index);
 }
 
 NRCPathType getNRCPathType(uint2 pixel)
@@ -166,6 +179,7 @@ RadianceQuery generateQuery(ShadingData sd)
     query.diffuse = sd.diffuse;
     query.specular = sd.specular;
     query.roughness = sd.linearRoughness;
+    query.voxel_idx = getVoxelIndex(query.pos);
     return query;
 }
 
@@ -188,6 +202,7 @@ void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
         gInferenceRadianceQuery[index] = query;
         gInferenceRadiancePixel[index] = gNRCPixel;
     }
+    // update voxel inference counter
 }
 
 uint addTrainingQuery(ShadingData sd)
@@ -195,6 +210,7 @@ uint addTrainingQuery(ShadingData sd)
     uint idx = gTrainingRadianceQuery.IncrementCounter();
     RadianceQuery query = generateQuery(sd);
     gTrainingRadianceQuery[idx] = query;
+    // update voxel training query counter
     return idx;
 }
 
@@ -210,6 +226,8 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
     sample.a = a;
     sample.b = b;
     gTrainingRadianceSample[idx] = sample;
+    // update voxel training sample counter
+
 }
 
 /*

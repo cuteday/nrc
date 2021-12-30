@@ -20,7 +20,6 @@ namespace NRC {
 
     namespace Parameters {
 
-
         // 4 steps each frame, with 16384 samples per batch
 #if LITE_SCREEN
         const uint2 screen_size = uint2(1280, 720);
