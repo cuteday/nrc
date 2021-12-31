@@ -31,7 +31,7 @@ namespace NRC {
         const uint32_t n_train_batch = 4;
 
         const uint32_t resolution = screen_size.x * screen_size.y;    // is a multiple of 256
-        const unsigned int max_inference_query_size = resolution;
+        const unsigned int max_inference_query_size = resolution + 1024;
         const unsigned int max_training_query_size = 1 << 16;                   // ~57,600
 
         const unsigned long long random_seed = 7272ULL; 
