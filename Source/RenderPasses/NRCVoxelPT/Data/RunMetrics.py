@@ -20,7 +20,7 @@ def render_graph_DefaultRenderGraph():
     loadRenderPassLibrary('TestPasses.dll')
     loadRenderPassLibrary('MinimalPathTracer.dll')
     loadRenderPassLibrary('RTGeometryPass.dll')
-    loadRenderPassLibrary('NRCPathTracer.dll')
+    loadRenderPassLibrary('NRCVoxelPT.dll')
     loadRenderPassLibrary('OptixDenoiser.dll')
     loadRenderPassLibrary('PassLibraryTemplate.dll')
     loadRenderPassLibrary('RTAO.dll')

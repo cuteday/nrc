@@ -12,9 +12,9 @@ def render_graph_PathTracerGraph():
     GBufferRT = createPass("GBufferRT", {'forceCullMode': False, 'cull': CullMode.CullBack, 'samplePattern': SamplePattern.Stratified, 'sampleCount': 16})
     GBufferRaster = createPass("GBufferRaster", {'forceCullMode': False, 'cull': CullMode.CullBack, 'samplePattern': SamplePattern.Stratified, 'sampleCount': 16})      # viewW not exported ? Not compatible with Path Tracers anymore ?
     g.addPass(GBufferRT, "GBuffer")
-#    NRCPathTracer = createPass("NRCPathTracer", {'params': PathTracerParams(useVBuffer=0, rayFootprintMode=0)})  # Generates an error apparently because of rayFootprintMode being unsigned, is there a specific syntac to use ?
-    NRCPathTracer = createPass("NRCPathTracer", {'params': PathTracerParams(useVBuffer=0)})
-    g.addPass(NRCPathTracer, "PathTracer")
+#    NRCVoxelPT = createPass("NRCVoxelPT", {'params': PathTracerParams(useVBuffer=0, rayFootprintMode=0)})  # Generates an error apparently because of rayFootprintMode being unsigned, is there a specific syntac to use ?
+    NRCVoxelPT = createPass("NRCVoxelPT", {'params': PathTracerParams(useVBuffer=0)})
+    g.addPass(NRCVoxelPT, "PathTracer")
     g.addEdge("GBuffer.vbuffer", "PathTracer.vbuffer")      # Required by Ray Footprint.
     g.addEdge("GBuffer.posW", "PathTracer.posW")
     g.addEdge("GBuffer.normW", "PathTracer.normalW")
