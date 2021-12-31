@@ -57,6 +57,7 @@ namespace {
     _Memory* mMemory;
     _Network* mNetwork;
     _Counter* mCounter;     // pinned memory via cudaHostAlloc
+    
 }
 
 template <typename T>
@@ -156,6 +157,10 @@ namespace NRC {
         delete mMemory;
     }
 
+    void VoxelNetwork::registerResource(NRCResource resource) {
+        mResource = resource;
+    }
+
     void VoxelNetwork::initializeNetwork(json net_config)
     {
         mNetwork = new _Network();
@@ -178,6 +183,8 @@ namespace NRC {
         json encoding_opts = net_config.value("encoding", json::object());
         m_learning_rate = optimizer_opts["nested"].value("learning_rate", 1e-3);
 
+        std::cout << "VoxelNetwork::Initialize networks for " + std::to_string(voxel_param.voxel_num) + " voxels!" << std::endl;
+
         for (int i = 0; i < voxel_param.voxel_num; i++) {
             //auto [loss, optimizer, network, trainer] = create_from_config(input_dim, output_dim, net_config);
             mNetwork->voxel_loss[i] = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts));
@@ -196,7 +203,6 @@ namespace NRC {
 
         mMemory->random_seq = new GPUMemory<float>(n_train_batch * batch_size);
         curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size);
-
     }
 
     void VoxelNetwork::reset()
@@ -206,12 +212,15 @@ namespace NRC {
             mNetwork->voxel_trainer[i]->initialize_params();
     }
 
-    void VoxelNetwork::beginFrame(uint32_t* counterBufferDevice)
+    void VoxelNetwork::prepare()
     {
-        cudaMemcpy(mCounter, counterBufferDevice, sizeof(uint32_t) * 3, cudaMemcpyDeviceToHost);
+        cudaMemcpy(mCounter, mResource.counterBufferPtr, sizeof(uint32_t) * 3, cudaMemcpyDeviceToHost);
+        cudaMemcpy(mCounter->inference_query_counter, mResource.inferenceQueryCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
+        cudaMemcpy(mCounter->training_sample_counter, mResource.trainingSampleCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
+        cudaMemcpy(mCounter->training_query_counter, mResource.trainingQueryCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
     }
 
-    void VoxelNetwork::inference(RadianceQuery* queries, uint2* pixels, cudaSurfaceObject_t output)
+    void VoxelNetwork::inference()
     {
         uint32_t n_elements = mCounter->inference_query_count;
         if (!n_elements) return;
@@ -219,8 +228,17 @@ namespace NRC {
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
     }
 
-    void VoxelNetwork::train(RadianceQuery* self_queries, RadianceSample* training_samples, float& loss)
+    void VoxelNetwork::train(float& loss)
     {
         CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));
+    }
+
+    void VoxelNetwork::debug()
+    {
+        printf("Total inference queries: %d, total training samples: %d\n", mCounter->inference_query_count, mCounter->training_sample_count);
+        for (int i = 0; i < voxel_param.voxel_num; i++) {
+            printf("current voxel: #%d, inference queries: %d, training samples: %d\n",
+                i, mCounter->inference_query_counter[i], mCounter->training_sample_counter[i]);
+        }
     }
 }

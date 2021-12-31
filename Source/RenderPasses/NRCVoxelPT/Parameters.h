@@ -36,7 +36,7 @@ namespace NRC {
 
         const unsigned long long random_seed = 7272ULL; 
 
-        const uint2 trainingPathStrideRR = trainingPathStride * 4u;
+        const uint2 trainingPathStrideRR = trainingPathStride * 1u;
 
         const unsigned int max_training_sample_size = resolution / trainingPathStride.x / trainingPathStride.y * 15;
         const uint32_t self_query_batch_size = resolution / trainingPathStride.x / trainingPathStride.y;     // ~ 57600

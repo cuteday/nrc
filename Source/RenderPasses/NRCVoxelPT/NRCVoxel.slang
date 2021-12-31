@@ -131,6 +131,8 @@ int getVoxelIndex(float3 coord)
 {
     float3 voxel_stride = float3(2) / gVoxelSize;
     uint3 voxel_index = uint3((coord - float3(-1)) / voxel_stride);
+    // handle corner cases: some primitives lie on the scene aabb.
+    voxel_index = max(0, min(gVoxelSize - 1, voxel_index));
     return flattenVoxelIndex(voxel_index);
 }
 
@@ -202,14 +204,18 @@ void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
     gScreenQueryBias[gNRCPixel] = float4(bias, 1);
     gScreenQueryReflectance[gNRCPixel] = float4(sd.specular + sd.diffuse, 1);
     RadianceQuery query = generateQuery(sd);
-    if (any(factor))
-    {
-        uint index = gInferenceRadianceQuery.IncrementCounter();
-        gInferenceRadianceQuery[index] = query;
-        gInferenceRadiancePixel[index] = gNRCPixel;
-    }
+    if (!any(factor)) return;
+    
+    uint index = gInferenceRadianceQuery.IncrementCounter();
+    gInferenceRadianceQuery[index] = query;
+    gInferenceRadiancePixel[index] = gNRCPixel;
     // update voxel inference counter
-    InterlockedAdd(gVoxelInferenceQueryCounter[query.voxel_idx], 1);
+    uint query_cnt = 999;
+    InterlockedAdd(gVoxelInferenceQueryCounter[query.voxel_idx], 1, query_cnt);
+    print("added an inference query at voxel #", query.voxel_idx);
+    print("now has", query_cnt);
+    if (query.voxel_idx > 0)
+        print("however it has been placed outside the voxel, its ncoord: ", query.pos);
 }
 
 uint addTrainingQuery(ShadingData sd)
@@ -234,8 +240,13 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
     sample.a = a;
     sample.b = b;
     gTrainingRadianceSample[idx] = sample;
+    uint sample_cnt = 999;
     // update voxel training sample counter
-    InterlockedAdd(gVoxelTrainingSampleCounter[query.voxel_idx], 1);
+    InterlockedAdd(gVoxelTrainingSampleCounter[query.voxel_idx], 1, sample_cnt);
+    print("added a training sample at voxel #", query.voxel_idx);
+    print("now has ", sample_cnt);
+    if (query.voxel_idx > 0)
+        print("however it has been placed outside the voxel, its ncoord: ", query.pos);
 }
 
 /*
@@ -243,9 +254,9 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
  */
 void debugRayFootprint(const PathData path, const NRCRayFootprint footprint)
 {
-    print("At path depth: ", path.length);
-    print("Path pdf: ", path.pdf);
-    print("Ray spread: ", footprint.spread);
-    print("Path intersection: ", path.origin);
-    print("Path a0: ", footprint.a0);
+    //print("At path depth: ", path.length);
+    //print("Path pdf: ", path.pdf);
+    //print("Ray spread: ", footprint.spread);
+    //print("Path intersection: ", path.origin);
+    //print("Path a0: ", footprint.a0);
 }

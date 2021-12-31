@@ -26,7 +26,7 @@ namespace NRC {
 
         NRCVoxelInterface();
 
-        void beginFrame();
+        void prepare();
 
         void trainFrame();
 
@@ -37,18 +37,25 @@ namespace NRC {
         void resetParameters();
 
         void registerNRCResources(Falcor::Buffer::SharedPtr pInferenceQueryBuffer,
+            Falcor::Buffer::SharedPtr pInferenceQueryPixel,
             Falcor::Texture::SharedPtr pScreenResultTexture,
             Falcor::Buffer::SharedPtr pTrainingQueryBuffer,
             Falcor::Buffer::SharedPtr pTrainingSampleBuffer,
-            Falcor::Buffer::SharedPtr pSharedCounterBuffer) {
-
+            Falcor::Buffer::SharedPtr pSharedCounterBuffer,
+            Falcor::Buffer::SharedPtr pInferenceQueryCounter,
+            Falcor::Buffer::SharedPtr pTrainingSampleCounter,
+            Falcor::Buffer::SharedPtr pTrainingQueryCounter) {
             mParameters.screenSize = uint2(pScreenResultTexture->getWidth(), pScreenResultTexture->getHeight());
-            mFalcorResources.screenResult = FalcorCUDA::mapTextureToSurfaceObject(pScreenResultTexture, cudaArrayColorAttachment);
-            mFalcorResources.inferenceQuery = (NRC::RadianceQuery*)pInferenceQueryBuffer->getCUDADeviceAddress();
-            mFalcorResources.trainingQuery = (NRC::RadianceQuery*)pTrainingQueryBuffer->getCUDADeviceAddress();
-            mFalcorResources.trainingSample = (NRC::RadianceSample*)pTrainingSampleBuffer->getCUDADeviceAddress();
-            uint32_t* counterBuffer = (uint32_t*)pSharedCounterBuffer->getCUDADeviceAddress();
-            mFalcorResources.counterBufferPtr = counterBuffer;
+            mResource.screenResult = FalcorCUDA::mapTextureToSurfaceObject(pScreenResultTexture, cudaArrayColorAttachment);
+            mResource.inferenceQuery = (NRC::RadianceQuery*)pInferenceQueryBuffer->getCUDADeviceAddress();
+            mResource.inferenceQueryPixel = (uint2*)pInferenceQueryPixel->getCUDADeviceAddress();
+            mResource.trainingQuery = (NRC::RadianceQuery*)pTrainingQueryBuffer->getCUDADeviceAddress();
+            mResource.trainingSample = (NRC::RadianceSample*)pTrainingSampleBuffer->getCUDADeviceAddress();
+            mResource.counterBufferPtr = (uint32_t*)pSharedCounterBuffer->getCUDADeviceAddress();
+            mResource.inferenceQueryCounter = (uint32_t*)pInferenceQueryCounter->getCUDADeviceAddress();
+            mResource.trainingSampleCounter = (uint32_t*)pTrainingSampleCounter->getCUDADeviceAddress();
+            mResource.trainingQueryCounter = (uint32_t*)pTrainingQueryCounter->getCUDADeviceAddress();
+            mNetwork->registerResource(mResource);
         }
 
         //    private:
@@ -66,14 +73,6 @@ namespace NRC {
         }mParameters;
 
         // register interop texture/surface here
-        struct {
-            // cuda device pointers in unified memory space.
-            NRC::RadianceQuery* inferenceQuery = nullptr;
-            cudaSurfaceObject_t screenResult;       // write inferenced results here
-            NRC::RadianceQuery* trainingQuery = nullptr;
-            NRC::RadianceSample* trainingSample = nullptr;
-            uint2* inferenceQueryPixel = nullptr;
-            uint32_t* counterBufferPtr = nullptr;
-        }mFalcorResources;
+        NRCResource mResource;
     };
 }

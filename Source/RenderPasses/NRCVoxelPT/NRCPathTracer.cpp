@@ -110,9 +110,10 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             throw std::runtime_error("Structure buffer size mismatch: inference pixel");
     }
 
-    if (!mNRCVoxel.pInferenceQueryVoxel) {
+    if (!mNRCVoxel.pInferenceQueryCounter) {
         uint3 voxel_size = Parameters::voxel_param.voxel_size;
         uint num_voxels = voxel_size.x * voxel_size.y * voxel_size.z;
+        logInfo("NRCVoxelPT::Initialize rendering resources for " + std::to_string(num_voxels) + " voxels!");
         mNRCVoxel.nVoxels = num_voxels;
 
         //mNRCVoxel.pInferencePixelVoxel = new Buffer::SharedPtr[num_voxels];
@@ -139,15 +140,13 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
         mScreen.pScreenQueryFactor = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
             nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mScreen.pScreenResult = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+            nullptr, ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
         mScreen.pScreenQueryReflectance = Texture::create2D(targetDim.x, targetDim.y, ResourceFormat::RGBA32Float, 1, 1,
-            nullptr, Falcor::ResourceBindFlags::Shared | ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
+            nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
 
         // also register these resource to NRCInterface again
-        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadianceQuery, mScreen.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
-            mNRC.pSharedCounterBuffer);
-        mNRC.pNRC->mFalcorResources.inferenceQueryPixel = (uint2*)mNRC.pInferenceRadiancePixel->getCUDADeviceAddress();
-
+        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadianceQuery, mNRC.pInferenceRadiancePixel, mScreen.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
+            mNRC.pSharedCounterBuffer, mNRCVoxel.pInferenceQueryCounter, mNRCVoxel.pTrainingSampleCounter, mNRCVoxel.pTrainingQueryCounter);
     }
     if (mNRCOptionChanged) {
         if (mNRC.enableNRC)
@@ -321,24 +320,10 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceSample->getUAVCounter().get(), 0, 4);
             pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 8, mNRC.pInferenceRadianceQuery->getUAVCounter().get(), 0, 4);
         }
-        mNRC.pNRC->beginFrame();
-        {
-            /* Test code: copy to page-able host memory costs ~1.5ms, while pinned memory ~0.5ms. */
-            // TODO: test buffer mapping performance...
-            //PROFILE("NRCPathTracer::execute()_CUDA_memcpy_counter");
-            //static uint32_t* mPinnedMemory = nullptr;
-            //if (!mPinnedMemory) 
-            //    cudaHostAlloc((void**)&mPinnedMemory, (size_t)256u, cudaHostAllocDefault);
-            //uint32_t sampleCounter;
-            //cudaMemcpy(&sampleCounter, mNRC.pNRC->mFalcorResources.trainingSampleCounter, sizeof(uint32_t), cudaMemcpyDeviceToHost);
-            //cudaMemcpy(&queryCounter, mNRC.pNRC->mFalcorResources.trainingQueryCounter, sizeof(uint32_t), cudaMemcpyDeviceToHost);
-            //cudaMemcpy(mPinnedMemory, mNRC.pNRC->mFalcorResources.trainingSampleCounter, sizeof(uint32_t), cudaMemcpyDeviceToHost);
-            //cudaMemcpy(mPinnedMemory, mNRC.pSharedCounterBuffer->getCUDADeviceAddress(), sizeof(uint32_t) * 4, cudaMemcpyDeviceToHost);
-            //mPinnedMemory = (uint32_t*)mNRC.pSharedCounterBuffer->map(Buffer::MapType::Read);
-            //std::cout << "Inference query count: " << mPinnedMemory[2] << std::endl;
-        }
         // well now it seems the raytracing shader invocation is asynchronous, do synchronization step here.
-        gpDevice->getRenderContext()->flush(true);
+        //gpDevice->getRenderContext()->flush(true);
+        pRenderContext->flush(true);
+        mNRC.pNRC->prepare();
         {
             // this takes ~10ms
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");

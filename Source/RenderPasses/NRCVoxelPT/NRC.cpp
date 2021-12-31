@@ -35,17 +35,15 @@ namespace NRC {
         mNetwork = VoxelNetwork::SharedPtr(new VoxelNetwork(net_config));
     }
 
-    void NRCVoxelInterface::beginFrame()
+    void NRCVoxelInterface::prepare()
     {
-        mNetwork->beginFrame(mFalcorResources.counterBufferPtr);
+        mNetwork->prepare();
     }
 
     void NRCVoxelInterface::trainFrame()
     {
         float loss;
-        /*mNetwork->train(mFalcorResources.trainingQuery, Parameters::max_training_query_size,
-            mFalcorResources.trainingSample, Parameters::max_training_sample_size, loss);*/
-        mNetwork->train(mFalcorResources.trainingQuery, mFalcorResources.trainingSample, loss);
+        mNetwork->train(loss);
         mStats.n_frames++;
         mStats.training_loss_avg = mStats.ema_factor * mStats.training_loss_avg + (1 - mStats.ema_factor) * loss;
 
@@ -56,9 +54,7 @@ namespace NRC {
 
     void NRCVoxelInterface::inferenceFrame()
     {
-        //mNetwork->inference(mFalcorResources.screenQuery, mFalcorResources.screenResult,
-        //    mParameters.screenSize.x, mParameters.screenSize.y);
-        mNetwork->inference(mFalcorResources.inferenceQuery, mFalcorResources.inferenceQueryPixel, mFalcorResources.screenResult);
+        mNetwork->inference();
     }
 
     void NRCVoxelInterface::printStats()
@@ -66,6 +62,7 @@ namespace NRC {
         std::stringstream ss;
         ss << "Current frame: " << mStats.n_frames << "loss: " << mStats.training_loss_avg;
         Falcor::logInfo(ss.str());
+        mNetwork->debug();
     }
 
     void NRCVoxelInterface::resetParameters()
