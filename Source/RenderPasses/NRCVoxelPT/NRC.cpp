@@ -42,6 +42,7 @@ namespace NRC {
 
     void NRCVoxelInterface::trainFrame()
     {
+        
         float loss;
         mNetwork->train(loss);
         mStats.n_frames++;

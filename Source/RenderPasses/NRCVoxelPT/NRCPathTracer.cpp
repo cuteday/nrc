@@ -146,7 +146,8 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
 
         // also register these resource to NRCInterface again
         mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadianceQuery, mNRC.pInferenceRadiancePixel, mScreen.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
-            mNRC.pSharedCounterBuffer, mNRCVoxel.pInferenceQueryCounter, mNRCVoxel.pTrainingSampleCounter, mNRCVoxel.pTrainingQueryCounter);
+            //mNRC.pSharedCounterBuffer,
+            mNRCVoxel.pInferenceQueryCounter, mNRCVoxel.pTrainingSampleCounter, mNRCVoxel.pTrainingQueryCounter);
     }
     if (mNRCOptionChanged) {
         if (mNRC.enableNRC)
@@ -313,17 +314,20 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             mTracer.pVars["NRCDataCB"]["gIsTrainingPass"] = true;
             mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim / Parameters::trainingPathStride, 1));
         }
-        {
-            // this takes <0.05ms
-            PROFILE("NRCPathTracer::execute()_Copy_CounterBuffer");
-            pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 0, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
-            pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceSample->getUAVCounter().get(), 0, 4);
-            pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 8, mNRC.pInferenceRadianceQuery->getUAVCounter().get(), 0, 4);
-        }
+        //{
+        //    // this takes <0.05ms
+        //    PROFILE("NRCPathTracer::execute()_Copy_CounterBuffer");
+        //    pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 0, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
+        //    pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceSample->getUAVCounter().get(), 0, 4);
+        //    pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 8, mNRC.pInferenceRadianceQuery->getUAVCounter().get(), 0, 4);
+        //}
         // well now it seems the raytracing shader invocation is asynchronous, do synchronization step here.
         //gpDevice->getRenderContext()->flush(true);
         pRenderContext->flush(true);
-        mNRC.pNRC->prepare();
+        {
+            PROFILE("NRCPathTracer::execute()_CUDA_Prepare_Resources");
+            mNRC.pNRC->prepare();
+        }
         {
             // this takes ~10ms
             PROFILE("NRCPathTracer::execute()_CUDA_Network_Inference");

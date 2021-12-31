@@ -27,7 +27,7 @@ namespace NRC {
         NRC::RadianceQuery* trainingQuery = nullptr;
         NRC::RadianceSample* trainingSample = nullptr;
         uint2* inferenceQueryPixel = nullptr;
-        uint32_t* counterBufferPtr = nullptr;
+        //uint32_t* counterBufferPtr = nullptr;
         // voxel related
         uint32_t* trainingSampleCounter = nullptr;
         uint32_t* trainingQueryCounter = nullptr;

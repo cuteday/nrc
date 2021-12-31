@@ -5,9 +5,12 @@
 #include "VoxelNetwork.h"
 #include "Helpers.h"
 #include "Parameters.h"
-#include "json/json.hpp"
 
 #include <curand.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+
+#include <json/json.hpp>
 #include <tiny-cuda-nn/config.h>
 #include <tiny-cuda-nn/common.h>
 
@@ -28,8 +31,8 @@ namespace {
     struct _Network {
         std::vector<std::shared_ptr<NetworkWithInputEncoding<precision_t>>> voxel_network;
         std::vector<std::shared_ptr<Loss<precision_t>>> voxel_loss;
-        std::vector <std::shared_ptr<Optimizer<precision_t>>> voxel_optimizer;
-        std::vector <std::shared_ptr<Trainer<float, precision_t, precision_t>>> voxel_trainer;
+        std::vector<std::shared_ptr<Optimizer<precision_t>>> voxel_optimizer;
+        std::vector<std::shared_ptr<Trainer<float, precision_t, precision_t>>> voxel_trainer;
     };
 
     struct _Memory {
@@ -54,10 +57,24 @@ namespace {
         uint32_t* inference_query_counter;
     };
 
+    struct _Stat {
+        uint32_t inference_query_count;
+        uint32_t training_sample_count;
+        uint32_t training_query_count;
+
+        thrust::host_vector<uint32_t> inference_query_counter_h;
+        thrust::host_vector<uint32_t> training_sample_counter_h;
+        thrust::host_vector<uint32_t> training_query_counter_h;
+
+        thrust::device_vector<uint32_t> inference_query_counter;
+        thrust::device_vector<uint32_t> training_sample_counter;
+        thrust::device_vector<uint32_t> training_query_counter;
+    };
+
+    _Stat mStat;
     _Memory* mMemory;
     _Network* mNetwork;
-    _Counter* mCounter;     // pinned memory via cudaHostAlloc
-    
+    _Counter* mCounter;     // pinned memory via cudaHostAlloc 
 }
 
 template <typename T>
@@ -74,70 +91,15 @@ __device__ void copyQuery(T* data, const NRC::RadianceQuery* query) {
 #endif
 }
 
-// linear kernels with only x-dim not 1. must be called using linear_kernal()
-// blockDim = 128, threadIdx is the index of a thread within a thread block, i.e. in [0, 128)
-// reference linear_kernel() for details.
-// stride: input dim
 template <uint32_t stride, typename T = float>
-__global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
-    NRC::RadianceQuery* queries, T* data) {
-    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i + offset < n_elements) {
-        uint32_t data_index = i * stride, query_index = i + offset;
-        copyQuery(&data[data_index], &queries[query_index]);
-    }
-}
-
-template <uint32_t stride, typename T = float>
-__global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
-    NRC::RadianceSample* samples, NRC::RadianceQuery* self_queries, T* self_query_pred,
-    T* training_data, T* training_target, uint32_t* training_sample_counter, uint32_t* self_query_counter,
-    float* random_indices = nullptr) {
-    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i + offset > n_elements) return;
-    int data_index = i * stride, sample_index = i + offset;
-    if (random_indices)
-        sample_index = (1 - random_indices[sample_index]) * *training_sample_counter;
-
-    int pred_index = samples[sample_index].idx; // pred_index == -1 if a self-query is not needed.
-
-    if (sample_index < *training_sample_counter) {
-        float3 factor = samples[sample_index].a, bias = samples[sample_index].b;
-        uint32_t output_index = i * 3;
-
-        copyQuery(&training_data[data_index], &samples[sample_index].query);
-
-        float3 pred_radiance = { 0, 0, 0 };
-        if (pred_index >= 0)    // else the sample doesn't contain a self query.
-            pred_radiance = { self_query_pred[pred_index * 3], self_query_pred[pred_index * 3 + 1], self_query_pred[pred_index * 3 + 2] };
-#if REFLECTANCE_FACT
-        float3 reflectance = samples[sample_index].query.diffuse + samples[sample_index].query.specular;
-        if (pred_index >= 0)
-            // restore self-query from reflectance factorization...
-            pred_radiance = pred_radiance * (self_queries[pred_index].diffuse + self_queries[pred_index].specular);
-        float3 radiance = safe_div(pred_radiance * factor + bias, reflectance);
-#else
-        float3 radiance = pred_radiance * factor + bias;
-#endif
-        * (float3*)&training_target[output_index] = radiance;
-    }
-}
-
-template <typename T>
-__global__ void mapIndexedRadianceToScreen(uint32_t n_elements, T* data,
-    cudaSurfaceObject_t output, Falcor::uint2* pixels) {
-    uint32_t i = threadIdx.x + blockDim.x * blockIdx.x;
-    if (i > n_elements) return;
-    uint32_t px = pixels[i].x, py = pixels[i].y;
-    uint32_t data_index = i * 3;
-    float4 radiance = { data[data_index], data[data_index + 1], data[data_index + 2], 1.0f };
-    surf2Dwrite(radiance, output, (int)sizeof(float4) * px, py);
+__global__ void sortForInference(const uint32_t n_elements, const NRC::RadianceQuery* queries, const uint32_t* offsets,
+    const uint32_t* counters, float* output, const uint32_t n_voxels) {
 
 }
-
-using namespace NRC::Parameters;
 
 namespace NRC {
+    using namespace Parameters;
+
     VoxelNetwork::VoxelNetwork(json config)
     {
         CUDA_CHECK_THROW(cudaStreamCreate(&inference_stream));
@@ -166,15 +128,22 @@ namespace NRC {
         mNetwork = new _Network();
         mMemory = new _Memory();
 
+        mStat.inference_query_counter_h.resize(voxel_param.voxel_num, 0);
+        mStat.training_sample_counter_h.resize(voxel_param.voxel_num, 0);
+        mStat.training_query_counter_h.resize(voxel_param.voxel_num, 0);
+        mStat.inference_query_counter.resize(voxel_param.voxel_num, 0);
+        mStat.training_sample_counter.resize(voxel_param.voxel_num, 0);
+        mStat.training_query_counter.resize(voxel_param.voxel_num, 0);
+
         mNetwork->voxel_network.resize(voxel_param.voxel_num);
         mNetwork->voxel_loss.resize(voxel_param.voxel_num);
         mNetwork->voxel_optimizer.resize(voxel_param.voxel_num);
         mNetwork->voxel_trainer.resize(voxel_param.voxel_num);
 
         cudaHostAlloc((void**)&mCounter, sizeof(_Counter), cudaHostAllocDefault);
-        cudaHostAlloc(&mCounter->inference_query_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
-        cudaHostAlloc(&mCounter->training_query_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
-        cudaHostAlloc(&mCounter->training_sample_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
+        //cudaHostAlloc(&mCounter->inference_query_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
+        //cudaHostAlloc(&mCounter->training_query_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
+        //cudaHostAlloc(&mCounter->training_sample_counter, voxel_param.voxel_num * sizeof(uint32_t), cudaHostAllocDefault);
 
         // network parameters
         json loss_opts = net_config.value("loss", json::object());
@@ -214,10 +183,24 @@ namespace NRC {
 
     void VoxelNetwork::prepare()
     {
-        cudaMemcpy(mCounter, mResource.counterBufferPtr, sizeof(uint32_t) * 3, cudaMemcpyDeviceToHost);
-        cudaMemcpy(mCounter->inference_query_counter, mResource.inferenceQueryCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
-        cudaMemcpy(mCounter->training_sample_counter, mResource.trainingSampleCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
-        cudaMemcpy(mCounter->training_query_counter, mResource.trainingQueryCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
+        // currently cost <<1ms, seems good φ(゜▽゜*)♪
+        //cudaMemcpy(mCounter, mResource.counterBufferPtr, sizeof(uint32_t) * 3, cudaMemcpyDeviceToHost);
+        //cudaMemcpy(mCounter->inference_query_counter, mResource.inferenceQueryCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
+        //cudaMemcpy(mCounter->training_sample_counter, mResource.trainingSampleCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
+        //cudaMemcpy(mCounter->training_query_counter, mResource.trainingQueryCounter, sizeof(uint32_t) * voxel_param.voxel_num, cudaMemcpyDeviceToHost);
+
+        // thrust's copy routine costs similar to 1 cudaMemcpy. 
+        thrust::copy(mResource.inferenceQueryCounter, mResource.inferenceQueryCounter + voxel_param.voxel_num, mStat.inference_query_counter.begin());
+        thrust::copy(mResource.trainingSampleCounter, mResource.trainingSampleCounter + voxel_param.voxel_num, mStat.training_sample_counter.begin());
+        thrust::copy(mResource.trainingQueryCounter, mResource.trainingQueryCounter + voxel_param.voxel_num, mStat.training_query_counter.begin());
+
+        thrust::copy(mStat.inference_query_counter.begin(), mStat.inference_query_counter.end(), mStat.inference_query_counter_h.begin());
+        thrust::copy(mStat.training_sample_counter.begin(), mStat.training_sample_counter.end(), mStat.training_sample_counter_h.begin());
+        thrust::copy(mStat.training_query_counter.begin(), mStat.training_query_counter.end(), mStat.training_query_counter_h.begin());
+
+        mStat.inference_query_count = thrust::reduce(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), 0, thrust::plus<uint32_t>());
+        mStat.training_query_count = thrust::reduce(mStat.training_query_counter_h.begin(), mStat.training_query_counter_h.end(), 0, thrust::plus<uint32_t>());
+        mStat.training_sample_count = thrust::reduce(mStat.training_sample_counter_h.begin(), mStat.training_sample_counter_h.end(), 0, thrust::plus<uint32_t>());
     }
 
     void VoxelNetwork::inference()
@@ -235,10 +218,11 @@ namespace NRC {
 
     void VoxelNetwork::debug()
     {
-        printf("Total inference queries: %d, total training samples: %d\n", mCounter->inference_query_count, mCounter->training_sample_count);
+        printf("Total inference queries: %d, total training samples: %d\n", mStat.inference_query_count, mStat.training_sample_count);
         for (int i = 0; i < voxel_param.voxel_num; i++) {
-            printf("current voxel: #%d, inference queries: %d, training samples: %d\n",
-                i, mCounter->inference_query_counter[i], mCounter->training_sample_counter[i]);
+            printf("thrust@current voxel: #%d, inference queries: %d, training samples: %d\n",
+                i, mStat.inference_query_counter_h[i], mStat.training_sample_counter_h[i]);
+            // the thrust counter on device seemes not print correctly, which may be not an issue.
         }
     }
 }

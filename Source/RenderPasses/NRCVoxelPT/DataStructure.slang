@@ -12,14 +12,9 @@ BEGIN_NAMESPACE_NRC
         float3 diffuse; // these parameters are passed through, since they preserve linearity    
         float _pad0;
         float3 specular;
-        int voxel_idx; // which voxel it belongs to? (in flatten index)
-    };
-
-    struct RadianceInfer
-    {
-        RadianceQuery query;
-        uint2 pixel;
-        float2 _pad0;
+        int voxel_idx;  // which voxel it belongs to? (in flatten index)
+        uint2 pixel;    // if this query belongs to a screen query...
+        float2 _pad1;
     };
 
     struct RadianceSample
