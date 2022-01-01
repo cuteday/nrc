@@ -68,5 +68,9 @@ __global__ void trim_cast(uint32_t num_elements, uint32_t stride_in, uint32_t st
     data_out[i] = data_in[elem * stride_in + idx];
 }
 
+template <typename T>
+__host__ __device__ inline T previous_multiple(T x, T divisor) {
+    return x - x % divisor;
+}
 
 #endif // !NRC_MATH_HELPERS

@@ -50,12 +50,12 @@ namespace NRC {
         VoxelNetwork(json config);
         ~VoxelNetwork();
 
-        void initializeNetwork(json net_config);
-        void registerResource(NRCResource resource);
-        void reset();
-        void flush() { cudaDeviceSynchronize(); }
-        void debug();
-        float& learningRate() { return m_learning_rate; };
+        __host__ void initializeNetwork(json net_config);
+        __host__ void registerResource(NRCResource resource);
+        __host__ void reset();
+        __host__ void flush() { cudaDeviceSynchronize(); }
+        __host__ void debug();
+        __host__ float& learningRate() { return m_learning_rate; };
 
         __host__ void prepare();
         __host__ void inference();

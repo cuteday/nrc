@@ -48,17 +48,21 @@ namespace NRC {
 #endif
         const uint32_t output_dim = 3;        // RGB
         //const uint32_t alignment = 16;        // input dim alignment
-        const std::string config_path = "../RenderPasses/NRCVoxelPT/Data/default_nrc_new.json";
+        const std::string config_path = "../RenderPasses/NRCVoxelPT/Data/default_nrc.json";
 
         // voxel related settings
         const uint32_t max_training_sample_voxel = 1 << 16;
-        const uint32_t max_inference_query_voxel = resolution;
+        //const uint32_t max_inference_query_voxel = resolution;
         struct VoxelConfig {
             uint3 voxel_size = { 1, 1, 1 };
             unsigned int voxel_num = 1;
         };
         extern VoxelConfig voxel_param;
     }
+
+    struct RadianceQueryCompact{
+        float data[Parameters::input_dim];
+    };
 }
 
 #endif

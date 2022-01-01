@@ -96,7 +96,7 @@ __global__ void generateBatchSequential(uint32_t n_elements, uint32_t offset,
 }
 
 template <uint32_t stride, typename T = float>
-__global__ void generateTrainingDataFromSamples(uint32_t n_elements, uint32_t offset,
+__global__ void generateTrainingData(uint32_t n_elements, uint32_t offset,
     NRC::RadianceSample* samples, NRC::RadianceQuery* self_queries, T* self_query_pred,
     T* training_data, T* training_target, uint32_t* training_sample_counter, uint32_t* self_query_counter, 
     float* random_indices = nullptr) {
@@ -314,7 +314,7 @@ namespace NRC {
         // randomly select 4 training batches over all samples
         curandGenerateUniform(rng, mMemory->random_seq->data(), n_train_batch * batch_size);
         for (uint32_t i = 0; i < n_train_batch; i++) {
-            linear_kernel(generateTrainingDataFromSamples<input_dim, float>, 0, training_stream, batch_size,
+            linear_kernel(generateTrainingData<input_dim, float>, 0, training_stream, batch_size,
                 i * batch_size, training_samples, self_queries, mMemory->training_self_pred->data(),
                 mMemory->training_data->data(), mMemory->training_target->data(),
                 training_sample_counter, self_query_counter, mMemory->random_seq->data());
