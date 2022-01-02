@@ -145,8 +145,13 @@ void rayGen()
             // Trace the path.
             float3 L;
 #ifdef NRC_ENABLE
-            if (!gVisualizeMode || gIsTrainingPass) L = tracePathNRC(gData, sd, path);
-            if (gVisualizeMode && !gIsTrainingPass) L = visualizeNRC(sd); 
+            if (!gVisualizeMode || gIsTrainingPass) {
+                float blend_nrc = sampleNext1D(path.sg);
+                if (blend_nrc >= gNRCBlendProb)
+                    L = tracePathNRC(gData, sd, path);
+                else L = visualizeNRC(sd, path);
+            }
+            if (gVisualizeMode && !gIsTrainingPass) L = visualizeNRC(sd, path); 
 #else
             L = tracePath(gData, sd, path);
 #endif

@@ -81,15 +81,12 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     bool state = PathTracer::beginFrame(pRenderContext, renderData);
     if (!state) return false;
     if (!mNRC.pNRC) {
-        //mNRC.pNRC = NRC::NRCInterface::SharedPtr(new NRC::NRCInterface());
         mNRC.pNRC = NRC::NRCVoxelInterface::SharedPtr(new NRC::NRCVoxelInterface());
         mNRC.pNetwork = mNRC.pNRC->mNetwork;
     }
 
     if (!mNRC.pTrainingRadianceQuery) {
         /* there are 3 ways to create a structured buffer shader resource */
-        //mNRC.pSample = Buffer::createStructured(mTracer.pProgram.get(), "gSample", 2000);
-        //mNRC.pSample = Buffer::createStructured(mTracer.pVars.getRootVar()["gSample"], 2000);
         mNRC.pTrainingRadianceQuery = Buffer::createStructured(sizeof(NRC::RadianceQuery), Parameters::max_training_query_size,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
         if (mNRC.pTrainingRadianceQuery->getStructSize() != sizeof(NRC::RadianceQuery)) // check struct size to avoid alignment problems (?)
@@ -126,11 +123,11 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
         //}
 
         // initialize counters!
-        mNRCVoxel.pInferenceQueryCounter = Buffer::createStructured(sizeof(uint), num_voxels,
+        mNRCVoxel.pInferenceQueryCounter = Buffer::createStructured(sizeof(uint32_t), num_voxels,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        mNRCVoxel.pTrainingQueryCounter = Buffer::createStructured(sizeof(uint), num_voxels,
+        mNRCVoxel.pTrainingQueryCounter = Buffer::createStructured(sizeof(uint32_t), num_voxels,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        mNRCVoxel.pTrainingSampleCounter = Buffer::createStructured(sizeof(uint), num_voxels,
+        mNRCVoxel.pTrainingSampleCounter = Buffer::createStructured(sizeof(uint32_t), num_voxels,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
     }
 
@@ -163,6 +160,10 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     pRenderContext->clearUAV(mNRCVoxel.pTrainingQueryCounter->getUAV().get(), uint4(0));
     pRenderContext->clearUAV(mNRCVoxel.pTrainingSampleCounter->getUAV().get(), uint4(0));
 
+    //cudaMemset(mNRCVoxel.pInferenceQueryCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
+    //cudaMemset(mNRCVoxel.pTrainingQueryCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
+    //cudaMemset(mNRCVoxel.pTrainingSampleCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
+    
     mTracer.pNRCPixelStats->beginFrame(pRenderContext, renderData.getDefaultTextureDims());
     return state;
 }
@@ -220,6 +221,8 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
         mNRCOptionChanged = true;
     }
     if(mNRC.enableNRC){
+        widget.checkbox("Enable training", mNRC.pNRC->enableTraining());
+
         if (auto group = widget.group("NRC Lowlevel Params")) {
             if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
                 || widget.var("Max training suffix bounces", mNRC.max_training_bounces, 3, 15, 1)
@@ -229,6 +232,7 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
         }
         widget.var("Terminate threshold inference", mNRC.footprint_thres_inference, 0.f, 15.f, 0.001f);
         widget.var("Terminate threshold suffix", mNRC.foorprint_thres_suffix, 0.f, 50.f, 0.001f);
+        widget.var("Blend factor", mNRC.prob_blend_nrc, 0.f, 1.f, 0.001f);
 
         if (auto group = widget.group("NRC Debug")) {
             // widget.group creates a sub widget.
@@ -314,13 +318,6 @@ void NRCPathTracer::execute(RenderContext* pRenderContext, const RenderData& ren
             mTracer.pVars["NRCDataCB"]["gIsTrainingPass"] = true;
             mpScene->raytrace(pRenderContext, mTracer.pProgram.get(), mTracer.pVars, uint3(targetDim / Parameters::trainingPathStride, 1));
         }
-        //{
-        //    // this takes <0.05ms
-        //    PROFILE("NRCPathTracer::execute()_Copy_CounterBuffer");
-        //    pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 0, mNRC.pTrainingRadianceQuery->getUAVCounter().get(), 0, 4);
-        //    pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 4, mNRC.pTrainingRadianceSample->getUAVCounter().get(), 0, 4);
-        //    pRenderContext->copyBufferRegion(mNRC.pSharedCounterBuffer.get(), 8, mNRC.pInferenceRadianceQuery->getUAVCounter().get(), 0, 4);
-        //}
         // well now it seems the raytracing shader invocation is asynchronous, do synchronization step here.
         //gpDevice->getRenderContext()->flush(true);
         pRenderContext->flush(true);
@@ -420,6 +417,8 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["NRCDataCB"]["gNRCTrainingPathStride"] = Parameters::trainingPathStride;
     pVars["NRCDataCB"]["gNRCTrainingPathStrideRR"] = Parameters::trainingPathStrideRR;
     pVars["NRCDataCB"]["gNRCAbsorptionProb"] = mNRC.prob_rr_suffix_absorption;
+    pVars["NRCDataCB"]["gNRCBlendProb"] = mNRC.prob_blend_nrc;
+
     pVars["NRCDataCB"]["gFootprintThresInference"] = mNRC.footprint_thres_inference;
     pVars["NRCDataCB"]["gFootprintThresSuffix"] = mNRC.foorprint_thres_suffix;
     // scene AABB for normalizing coordinates

@@ -51,10 +51,13 @@ namespace {
         GPUMatrix* training_self_pred = nullptr;
         GPUMemory<float>* random_seq = nullptr;
 
-        // thrust's place
+        // thrust's place, used in data-partit kernels
         device_vector<NRC::RadianceSample*> sample_storage;
         device_vector<uint64_t> sample_voxel_counter;
         host_vector<uint64_t> sample_voxel_counter_h;
+
+        device_vector<uint32_t> inference_voxel_counter;
+        device_vector<NRC::RadianceQuery> inference_query_sorted;
     };
 
     struct _Stat {
@@ -62,20 +65,20 @@ namespace {
         uint32_t training_sample_count;
         uint32_t training_query_count;
 
-        device_vector<NRC::RadianceQuery> inference_query;
         device_vector<uint32_t> inference_sorting_counter;
 
+        // used for sorting and partitioning queries.
         device_vector<uint32_t> inference_query_voxel;
-        device_vector<uint32_t> training_sample_voxel;
         device_vector<uint32_t> training_query_voxel;
+
+        device_vector<uint32_t> inference_query_offset;
+
+        host_vector<uint32_t> inference_query_offset_h;
+        host_vector<uint32_t> training_query_offset_h;
 
         host_vector<uint32_t> inference_query_counter_h;
         host_vector<uint32_t> training_sample_counter_h;
         host_vector<uint32_t> training_query_counter_h;
-
-        host_vector<uint32_t> inference_query_offset;
-        host_vector<uint32_t> training_sample_offset;
-        host_vector<uint32_t> training_query_offset;
 
         device_vector<uint32_t> inference_query_counter;
         device_vector<uint32_t> training_sample_counter;
@@ -107,22 +110,27 @@ struct get_voxel_index {    // thrust custom transform functor
 };
 
 template <uint32_t stride, typename T = float>
-__global__ void sortForInference(const uint32_t n_elements, const NRC::RadianceQuery* queries, const device_vector<uint32_t> &offsets,
-    uint32_t* counters, float* output, const uint32_t n_voxels) {
-    
+__global__ void sortForInference(const uint32_t n_elements, const NRC::RadianceQuery queries[], 
+    const uint32_t offsets[], uint32_t counters[], NRC::RadianceQuery output[]) {
+    uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i > n_elements) return;
+    uint32_t voxel_id = queries[i].voxel_idx;
+    uint32_t query_id = atomicAdd(counters + voxel_id, 1);
+    uint32_t write_id = offsets[voxel_id] + query_id;
+    output[write_id] = queries[i];
 }
 
 template <uint32_t stride>
-__global__ void generateInferenceData(const uint32_t n_elements, const NRC::RadianceQuery* queries,
-    float* output) {
+__global__ void generateInferenceData(const uint32_t n_elements, const NRC::RadianceQuery queries[],
+    float output[]) {
     uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i > n_elements) return;
     copyQuery(&output[i * stride], &queries[i]);
 }
 
 template <typename T>
-__global__ void mapRadianceToScreen(const uint32_t n_elements, const NRC::RadianceQuery* queries,
-    const float* data, cudaSurfaceObject_t output) {
+__global__ void mapRadianceToScreen(const uint32_t n_elements, const NRC::RadianceQuery queries[],
+    const float data[], cudaSurfaceObject_t output) {
     uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i > n_elements) return;
     uint32_t px = queries[i].pixel.x, py = queries[i].pixel.y;
@@ -132,9 +140,9 @@ __global__ void mapRadianceToScreen(const uint32_t n_elements, const NRC::Radian
 }
 
 template <typename T = float>
-__global__ void sortForTraining(const uint32_t n_elements, const NRC::RadianceSample* samples,
-    uint64_t* counters, NRC::RadianceSample* sample_storage[],
-    const uint32_t n_voxels, const uint32_t n_max_samples) {
+__global__ void sortForTraining(const uint32_t n_elements, const NRC::RadianceSample samples[],
+    uint64_t counters[], NRC::RadianceSample* sample_storage[],
+    const uint32_t n_max_samples) {
     uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i > n_elements) return;
     uint32_t voxel_id = samples[i].query.voxel_idx;
@@ -144,12 +152,10 @@ __global__ void sortForTraining(const uint32_t n_elements, const NRC::RadianceSa
 }
 
 template <uint32_t stride, typename T = float>
-__global__ void generateTrainingData(const uint32_t n_elements, const NRC::RadianceSample* samples,
+__global__ void generateTrainingData(const uint32_t n_elements, const NRC::RadianceSample samples[],
     uint32_t n_samples, float* input_data, float* output_data, float* random_sequence = nullptr) {
     uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i > n_elements) return;
-
-    //const NRC::RadianceSample* samples = *samples;
 
     uint32_t sample_id = random_sequence ? (1. - random_sequence[i]) * n_samples : (float)i / n_elements * n_samples;
     int input_data_index = i * stride, output_data_index = i * 3;
@@ -196,8 +202,6 @@ namespace NRC {
         mNetwork = new _Network();
         mMemory = new _Memory();
 
-        mStat.inference_query.resize(max_inference_query_size);
-
         uint32_t n_voxels = voxel_param.voxel_num;
 
         mStat.inference_query_counter_h.resize(n_voxels, 0);
@@ -208,16 +212,19 @@ namespace NRC {
         mStat.training_query_counter.resize(n_voxels, 0);
 
         mStat.inference_query_offset.resize(n_voxels);
+        mStat.inference_query_offset_h.resize(n_voxels);
         mStat.inference_query_voxel.reserve(max_inference_query_size);
 
-        mMemory->sample_storage.reserve(n_voxels);
+        mMemory->sample_storage.resize(n_voxels);
         for (int i = 0; i < n_voxels; i++) {
             RadianceSample* samples;
             cudaMalloc(&samples, sizeof(RadianceSample) * max_training_sample_voxel);
-            mMemory->sample_storage.push_back(samples);
+            mMemory->sample_storage[i] = samples;
         }
         mMemory->sample_voxel_counter.resize(n_voxels);
         mMemory->sample_voxel_counter_h.resize(n_voxels);
+        mMemory->inference_voxel_counter.resize(n_voxels);
+        mMemory->inference_query_sorted.resize(max_inference_query_size);
 
         mNetwork->voxel_network.resize(n_voxels);
         mNetwork->voxel_loss.resize(n_voxels);
@@ -253,56 +260,58 @@ namespace NRC {
 
     void VoxelNetwork::reset()
     {
-        CUDA_CHECK_THROW(cudaDeviceSynchronize());
+        cudaDeviceSynchronize();
         for (int i = 0; i < voxel_param.voxel_num; i++)
             mNetwork->voxel_trainer[i]->initialize_params();
-        
     }
 
-    void VoxelNetwork::prepare()
+    void VoxelNetwork::prepareTraining()
     {
         // currently cost << 1ms, seems good φ(゜▽゜*)♪
-
-        //printf("VoxelNetwork::preparing nrc resources\n");
-        //printf("VoxelNetwork::copying nrc resource counters\n");
         // thrust's copy routine costs similar to 1 cudaMemcpy. 
-        thrust::copy(mResource.inferenceQueryCounter, mResource.inferenceQueryCounter + voxel_param.voxel_num, mStat.inference_query_counter.begin());
         thrust::copy(mResource.trainingSampleCounter, mResource.trainingSampleCounter + voxel_param.voxel_num, mStat.training_sample_counter.begin());
         thrust::copy(mResource.trainingQueryCounter, mResource.trainingQueryCounter + voxel_param.voxel_num, mStat.training_query_counter.begin());
-        //printf("VoxelNetwork::transfer counters to device\n");
-        thrust::copy(mStat.inference_query_counter.begin(), mStat.inference_query_counter.end(), mStat.inference_query_counter_h.begin());
         thrust::copy(mStat.training_sample_counter.begin(), mStat.training_sample_counter.end(), mStat.training_sample_counter_h.begin());
         thrust::copy(mStat.training_query_counter.begin(), mStat.training_query_counter.end(), mStat.training_query_counter_h.begin());
-        //printf("VoxelNetwork::reduce to get total counts\n");
-        mStat.inference_query_count = thrust::reduce(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), 0, thrust::plus<uint32_t>());
+        //mStat.inference_query_count = thrust::reduce(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), 0, thrust::plus<uint32_t>());
         mStat.training_query_count = thrust::reduce(mStat.training_query_counter_h.begin(), mStat.training_query_counter_h.end(), 0, thrust::plus<uint32_t>());
         mStat.training_sample_count = thrust::reduce(mStat.training_sample_counter_h.begin(), mStat.training_sample_counter_h.end(), 0, thrust::plus<uint32_t>());
-        //printf("VoxelNetwork::sorting inference queries by voxel index\n");
+        // until here, the all above operations costs < 1ms
+        // strange, the transform costs ~0.2ms while the sort_by_key costs 10ms (Aris: ! ? ! ?)
+        // store training sample into corresponding voxel's storage. this takes ~4ms.
+        linear_kernel(sortForTraining<float>, 0, training_stream, mStat.training_sample_count,
+            mResource.trainingSample, mMemory->sample_voxel_counter.data().get(), mMemory->sample_storage.data().get(), max_training_sample_voxel);
+        thrust::copy(mMemory->sample_voxel_counter.begin(), mMemory->sample_voxel_counter.end(), mMemory->sample_voxel_counter_h.begin());
+        // regenerate random sequence for training sample shuffling
+        curandGenerateUniform(rng, mMemory->random_seq->data(), max_training_sample_voxel);
+        CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));
+    }
+
+    void VoxelNetwork::prepareInference()
+    {
+        uint32_t n_voxels = voxel_param.voxel_num;
+        thrust::copy(mResource.inferenceQueryCounter, mResource.inferenceQueryCounter + n_voxels, mStat.inference_query_counter.begin());
+        thrust::copy(mStat.inference_query_counter.begin(), mStat.inference_query_counter.end(), mStat.inference_query_counter_h.begin());
+        mStat.inference_query_count = thrust::reduce(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), 0, thrust::plus<uint32_t>());
+        thrust::exclusive_scan(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), mStat.inference_query_offset_h.begin());
+#if THRUST_INFERENCE_SORT
         mStat.inference_query_voxel.resize(mStat.inference_query_count);
         thrust::transform(mResource.inferenceQuery, mResource.inferenceQuery + mStat.inference_query_count,
             mStat.inference_query_voxel.begin(), get_voxel_index());
-        // until here, the all above operations costs < 1ms
-
-        // strange, the transform costs ~0.2ms while the sort_by_key costs 10ms (Aris: ! ? ! ?)
-        //printf("VoxelNetwork::thrust sorting %d inference queries\n", mStat.inference_query_voxel.size());
-        // copy these queries costs ~1ms!
-        {
+        {   // copy these queries costs ~1ms!
             //thrust::copy(mResource.inferenceQuery, mResource.inferenceQuery + mStat.inference_query_count, mStat.inference_query.begin());
             //thrust::sort_by_key(mStat.inference_query_voxel.begin(), mStat.inference_query_voxel.end(), mStat.inference_query.begin(), thrust::less<uint32_t>());
             thrust::sort_by_key(mStat.inference_query_voxel.begin(), mStat.inference_query_voxel.end(), mResource.inferenceQuery, thrust::less<uint32_t>());
         }
-        thrust::exclusive_scan(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), mStat.inference_query_offset.begin());
-        //printf("VoxelNetwork::preparing finished for the current frame\n");
-
-        // store training sample into corresponding voxel's storage. this takes ~4ms.
-        linear_kernel(sortForTraining<float>, 0, inference_stream, mStat.training_sample_count,
-            mResource.trainingSample, mMemory->sample_voxel_counter.data().get(), mMemory->sample_storage.data().get(), voxel_param.voxel_num, max_training_sample_voxel);
-        thrust::copy(mMemory->sample_voxel_counter.begin(), mMemory->sample_voxel_counter.end(), mMemory->sample_voxel_counter_h.begin());
-        //for (int i = 0; i < voxel_param.voxel_num; i++) 
-            //    printf("VoxelNetwork::voxel #%d now has %d training samples\n", i, mMemory->sample_voxel_counter_h[i]);
-        
-        // regenerate random sequence for training sample shuffling
-        curandGenerateUniform(rng, mMemory->random_seq->data(), max_training_sample_voxel);
+#else
+        // this kernel invocation costs ~2ms, while the thrust radix sorting takes ~10ms.
+        thrust::copy(mStat.inference_query_offset_h.begin(), mStat.inference_query_offset_h.end(), mStat.inference_query_offset.begin());
+        cudaMemset(mMemory->inference_voxel_counter.data().get(), 0, sizeof(uint32_t) * n_voxels);
+        //thrust::fill(mMemory->inference_voxel_counter.begin(), mMemory->inference_voxel_counter.end(), 0);
+        linear_kernel(sortForInference<output_dim>, 0, inference_stream, mStat.inference_query_count, mResource.inferenceQuery,
+            mStat.inference_query_offset.data().get(), mMemory->inference_voxel_counter.data().get(), mMemory->inference_query_sorted.data().get());
+#endif
+        CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
     }
 
     void VoxelNetwork::inference()
@@ -312,25 +321,30 @@ namespace NRC {
         uint32_t n_voxels = voxel_param.voxel_num;
         if (!n_elements) return;
 
+#if THRUST_INFERENCE_SORT
+        RadianceQuery* sorted_query = mResource.inferenceQuery;
+#else
+        RadianceQuery* sorted_query = mMemory->inference_query_sorted.data().get();
+#endif
+
         for (int i = 0; i < n_voxels; i++) {
             uint32_t n_query = mStat.inference_query_counter_h[i];
             uint32_t inference_batch_size = next_multiple(n_query, 128u);
             if (n_query == 0) continue;
 
-            RadianceQuery* query_data_ptr= mResource.inferenceQuery + mStat.inference_query_offset[i];
-            linear_kernel(generateInferenceData<input_dim>, 0, inference_stream, n_query,
-                query_data_ptr, mMemory->inference_data->data());
-            float* input_data_ptr = mMemory->inference_data->data();
+            RadianceQuery* query_data_ptr = sorted_query + mStat.inference_query_offset[i];
+            float3* input_data_ptr = (float3*)mMemory->inference_data->data() + mStat.inference_query_offset[i];
             float3* output_data_ptr = (float3*)mMemory->inference_target->data() + mStat.inference_query_offset[i];
-
             GPUMatrix input_data((float*)input_data_ptr, input_dim, inference_batch_size);
             GPUMatrix output_data((float*)output_data_ptr, output_dim, inference_batch_size);
+            linear_kernel(generateInferenceData<input_dim>, 0, inference_stream, n_query,
+                query_data_ptr, input_data.data());
             //printf("Submitting voxel #%d inference task: offset %d, and n#queries %d\n",
             //    i, mStat.inference_query_offset[i], n_query);
             mNetwork->voxel_network[i]->inference(inference_stream, input_data, output_data);
         }
         linear_kernel(mapRadianceToScreen<float>, 0, inference_stream, n_elements,
-            mResource.inferenceQuery, mMemory->inference_target->data(), mResource.screenResult);
+            sorted_query, mMemory->inference_target->data(), mResource.screenResult);
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
     }
 

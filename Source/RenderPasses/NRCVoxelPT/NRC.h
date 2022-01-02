@@ -36,6 +36,8 @@ namespace NRC {
 
         void resetParameters();
 
+        bool& enableTraining() { return mEnableTraining; }
+
         void registerNRCResources(Falcor::Buffer::SharedPtr pInferenceQueryBuffer,
             Falcor::Buffer::SharedPtr pInferenceQueryPixel,
             Falcor::Texture::SharedPtr pScreenResultTexture,
@@ -58,9 +60,9 @@ namespace NRC {
             mNetwork->registerResource(mResource);
         }
 
-        //    private:
         VoxelNetwork::SharedPtr mNetwork = nullptr;
 
+    private:
         struct {
             int n_frames = 0;
             float training_loss_avg = 0;    // EMA
@@ -74,5 +76,6 @@ namespace NRC {
 
         // register interop texture/surface here
         NRCResource mResource;
+        bool mEnableTraining = true;
     };
 }

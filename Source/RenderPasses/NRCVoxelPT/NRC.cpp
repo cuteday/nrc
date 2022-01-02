@@ -37,12 +37,21 @@ namespace NRC {
 
     void NRCVoxelInterface::prepare()
     {
-        mNetwork->prepare();
+
+        if (mEnableTraining) {
+            PROFILE("NRCVoxelInterface::prepare()_PrepareTraining");
+            mNetwork->prepareTraining();
+        }
+        {
+            PROFILE("NRCVoxelInterface::prepare()_PrepareInference");
+            mNetwork->prepareInference();
+        }
     }
 
     void NRCVoxelInterface::trainFrame()
     {
-        
+        if (!mEnableTraining) return;
+
         float loss;
         mNetwork->train(loss);
         mStats.n_frames++;

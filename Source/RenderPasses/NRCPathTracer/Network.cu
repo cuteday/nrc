@@ -251,10 +251,10 @@ namespace NRC {
         //linear_kernel(mapPredRadianceToScreen<float>, 0, inference_stream, n_elements, width, mMemory->inference_target->data(), output);
         // map method #2:
         dim3 dimBlock(16, 16), dimGrid(div_round_up(width, 16u), div_round_up(height, 16u));
-        mapPredRadianceToScreen2<float> <<<dimGrid, dimBlock, 0, inference_stream >>>
-            (mMemory->inference_target->data(), output, width, height);
+        //mapPredRadianceToScreen2<float> <<<dimGrid, dimBlock, 0, inference_stream >>>
+        //    (mMemory->inference_target->data(), output, width, height);
         // indexed mapping:
-        //linear_kernel(mapIndexedRadianceToScreen<float>, 0, inference_stream, n_elements, mMemory->inference_target->data(), output, nullptr);
+        linear_kernel(mapIndexedRadianceToScreen<float>, 0, inference_stream, n_elements, mMemory->inference_target->data(), output, nullptr);
 
         CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
     }

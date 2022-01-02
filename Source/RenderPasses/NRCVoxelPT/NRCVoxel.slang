@@ -23,6 +23,7 @@ cbuffer NRCDataCB
     bool gVisualizeMode;
     bool gIsTrainingPass;               // If we are in the training pass, dispatch training suffix via sparse sampling
     float gNRCAbsorptionProb;
+    float gNRCBlendProb;
     float gFootprintThresInference;     // hyperparam for ray termination heuristic
     float gFootprintThresSuffix;
     uint2 gNRCScreenSize;               // width x height
@@ -94,11 +95,6 @@ struct PathVertexRecord
 
 // for RR training data, no radiance info is needed
 // for self training data, additional radiance info is needed
-//RWStructuredBuffer<RadianceQuery> gVoxelTrainingQuery[];
-//RWStructuredBuffer<RadianceSample> gVoxelTrainingSample[];
-//RWStructuredBuffer<RadianceQuery> gVoxelInferenceQuery[];
-//RWStructuredBuffer<uint2> gVoxelInferencePixel[];
-
 RWStructuredBuffer<RadianceQuery> gTrainingRadianceQuery;
 RWStructuredBuffer<RadianceSample> gTrainingRadianceSample;
 // for self training data, additional radiance info is needed
@@ -208,15 +204,13 @@ void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
     RadianceQuery query = generateQuery(sd);
     query.pixel = gNRCPixel;
     uint index = gInferenceRadianceQuery.IncrementCounter();
-    gInferenceRadianceQuery[index] = query;
-    gInferenceRadiancePixel[index] = gNRCPixel;
-    // update voxel inference counter
-    uint query_cnt = 999;
-    InterlockedAdd(gVoxelInferenceQueryCounter[query.voxel_idx], 1, query_cnt);
-    print("added an inference query at voxel #", query.voxel_idx);
-    print("now has", query_cnt);
-    if (query.voxel_idx > 0)
-        print("however it has been placed outside the voxel, its ncoord: ", query.pos);
+    if (index < gNRCScreenSize.x * gNRCScreenSize.y)
+    {
+        gInferenceRadianceQuery[index] = query;
+        gInferenceRadiancePixel[index] = gNRCPixel;
+        // update voxel inference counter
+        InterlockedAdd(gVoxelInferenceQueryCounter[query.voxel_idx], 1);
+    }
 }
 
 uint addTrainingQuery(ShadingData sd)
@@ -235,17 +229,16 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
         // TODO: does isnan() in hlsl works properly?
         return;
     uint idx = gTrainingRadianceSample.IncrementCounter();
+    if (idx > 1344000) return;
     RadianceSample sample = { };
     sample.query = query;
     sample.idx = queryIndex;
     sample.a = a;
     sample.b = b;
     gTrainingRadianceSample[idx] = sample;
-    uint sample_cnt = 999;
     // update voxel training sample counter
-    InterlockedAdd(gVoxelTrainingSampleCounter[query.voxel_idx], 1, sample_cnt);
+    InterlockedAdd(gVoxelTrainingSampleCounter[query.voxel_idx], 1);
     print("added a training sample at voxel #", query.voxel_idx);
-    print("now has ", sample_cnt);
     if (query.voxel_idx > 0)
         print("however it has been placed outside the voxel, its ncoord: ", query.pos);
 }
@@ -255,9 +248,9 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
  */
 void debugRayFootprint(const PathData path, const NRCRayFootprint footprint)
 {
-    //print("At path depth: ", path.length);
-    //print("Path pdf: ", path.pdf);
-    //print("Ray spread: ", footprint.spread);
-    //print("Path intersection: ", path.origin);
-    //print("Path a0: ", footprint.a0);
+    print("At path depth: ", path.length);
+    print("Path pdf: ", path.pdf);
+    print("Ray spread: ", footprint.spread);
+    print("Path intersection: ", path.origin);
+    print("Path a0: ", footprint.a0);
 }

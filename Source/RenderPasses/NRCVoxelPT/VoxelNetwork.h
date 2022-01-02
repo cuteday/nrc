@@ -57,7 +57,8 @@ namespace NRC {
         __host__ void debug();
         __host__ float& learningRate() { return m_learning_rate; };
 
-        __host__ void prepare();
+        __host__ void prepareTraining();
+        __host__ void prepareInference();
         __host__ void inference();
         __host__ void train(float& loss);
 

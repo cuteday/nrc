@@ -67,6 +67,7 @@ private:
         bool visualizeNRC = false;
         uint32_t visualizeMode = 1;
         float prob_rr_suffix_absorption = 0.2f;
+        float prob_blend_nrc = 0.2f;
         float footprint_thres_inference = 2.5f;
         float foorprint_thres_suffix = 20.f;
 

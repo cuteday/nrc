@@ -14,6 +14,8 @@
 #define REFLECTANCE_FACT    1
 #define LITE_SCREEN         0
 
+#define THRUST_INFERENCE_SORT 0
+
 namespace NRC {
     using Falcor::uint2;
     using Falcor::uint3;
@@ -38,7 +40,7 @@ namespace NRC {
 
         const uint2 trainingPathStrideRR = trainingPathStride * 1u;
 
-        const unsigned int max_training_sample_size = resolution / trainingPathStride.x / trainingPathStride.y * 15;
+        const unsigned int max_training_sample_size = 1920 * 1080 * 15 / 36;
         const uint32_t self_query_batch_size = resolution / trainingPathStride.x / trainingPathStride.y;     // ~ 57600
 
 #if AUX_INPUTS

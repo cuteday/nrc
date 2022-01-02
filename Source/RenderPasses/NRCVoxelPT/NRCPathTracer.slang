@@ -200,8 +200,10 @@ float3 tracePathNRC(const PathTracerData pt, ShadingData sd, inout PathData path
     return queryRadiance;
 }
 
-float3 visualizeNRC(ShadingData sd){
+float3 visualizeNRC(ShadingData sd, inout PathData path)
+{
     //float3 primaryRayDir = -sd.fromLocal(sd.V);
-    writeScreenInferenceQuery(sd, float3(1.0), float3(0.0));
-    return float3(0);
+    path.L += sd.emissive;
+    writeScreenInferenceQuery(sd, float3(1.0), path.L);
+    return path.L;
 }
