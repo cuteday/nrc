@@ -38,10 +38,12 @@ namespace NRC {
     void NRCVoxelInterface::prepare()
     {
 
-        if (mEnableTraining) {
+        if (mEnableTraining)
+        {
             PROFILE("NRCVoxelInterface::prepare()_PrepareTraining");
             mNetwork->prepareTraining();
         }
+        if (mEnableInference)
         {
             PROFILE("NRCVoxelInterface::prepare()_PrepareInference");
             mNetwork->prepareInference();
@@ -64,6 +66,7 @@ namespace NRC {
 
     void NRCVoxelInterface::inferenceFrame()
     {
+        if (!mEnableInference) return;
         mNetwork->inference();
     }
 

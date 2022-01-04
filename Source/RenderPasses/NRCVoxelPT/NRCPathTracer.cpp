@@ -83,6 +83,10 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     if (!mNRC.pNRC) {
         mNRC.pNRC = NRC::NRCVoxelInterface::SharedPtr(new NRC::NRCVoxelInterface());
         mNRC.pNetwork = mNRC.pNRC->mNetwork;
+        uint3 voxel_size = Parameters::voxel_param.voxel_size;
+        uint num_voxels = voxel_size.x * voxel_size.y * voxel_size.z;
+        logInfo("NRCVoxelPT::Initialize rendering resources for " + std::to_string(num_voxels) + " voxels!");
+        mNRCVoxel.nVoxels = num_voxels;
     }
 
     if (!mNRC.pTrainingRadianceQuery) {
@@ -101,33 +105,19 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             throw std::runtime_error("Structure buffer size mismatch: inference query");
         mNRC.pSharedCounterBuffer = Buffer::createStructured(sizeof(uint32_t), 4,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::UnorderedAccess);
-        mNRC.pInferenceRadiancePixel = Buffer::createStructured(sizeof(uint2), Parameters::max_inference_query_size,
-            Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        if (mNRC.pInferenceRadiancePixel->getStructSize() != sizeof(uint2))
-            throw std::runtime_error("Structure buffer size mismatch: inference pixel");
+        //mNRC.pInferenceRadiancePixel = Buffer::createStructured(sizeof(uint2), Parameters::max_inference_query_size,
+        //    Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
+        //if (mNRC.pInferenceRadiancePixel->getStructSize() != sizeof(uint2))
+        //    throw std::runtime_error("Structure buffer size mismatch: inference pixel");
     }
 
     if (!mNRCVoxel.pInferenceQueryCounter) {
-        uint3 voxel_size = Parameters::voxel_param.voxel_size;
-        uint num_voxels = voxel_size.x * voxel_size.y * voxel_size.z;
-        logInfo("NRCVoxelPT::Initialize rendering resources for " + std::to_string(num_voxels) + " voxels!");
-        mNRCVoxel.nVoxels = num_voxels;
-
-        //mNRCVoxel.pInferencePixelVoxel = new Buffer::SharedPtr[num_voxels];
-        //mNRCVoxel.pInferenceQueryVoxel = new Buffer::SharedPtr[num_voxels];
-        //mNRCVoxel.pTrainingQueryVoxel = new Buffer::SharedPtr[num_voxels];
-        //mNRCVoxel.pTrainingSampleVoxel = new Buffer::SharedPtr[num_voxels];
-        //for (int i = 0; i < num_voxels; i++) {
-        //    mNRCVoxel.pInferencePixelVoxel[i] = Buffer::createStructured(sizeof(uint2), Parameters::max_training_sample_voxel, 
-        //        Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        //}
-
         // initialize counters!
-        mNRCVoxel.pInferenceQueryCounter = Buffer::createStructured(sizeof(uint32_t), num_voxels,
+        mNRCVoxel.pInferenceQueryCounter = Buffer::createStructured(sizeof(uint32_t), mNRCVoxel.nVoxels,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        mNRCVoxel.pTrainingQueryCounter = Buffer::createStructured(sizeof(uint32_t), num_voxels,
+        mNRCVoxel.pTrainingQueryCounter = Buffer::createStructured(sizeof(uint32_t), mNRCVoxel.nVoxels,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
-        mNRCVoxel.pTrainingSampleCounter = Buffer::createStructured(sizeof(uint32_t), num_voxels,
+        mNRCVoxel.pTrainingSampleCounter = Buffer::createStructured(sizeof(uint32_t), mNRCVoxel.nVoxels,
             Falcor::ResourceBindFlags::Shared | Falcor::ResourceBindFlags::ShaderResource | Falcor::ResourceBindFlags::UnorderedAccess);
     }
 
@@ -142,8 +132,7 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
             nullptr, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess);
 
         // also register these resource to NRCInterface again
-        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadianceQuery, mNRC.pInferenceRadiancePixel, mScreen.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
-            //mNRC.pSharedCounterBuffer,
+        mNRC.pNRC->registerNRCResources(mNRC.pInferenceRadianceQuery, mScreen.pScreenResult, mNRC.pTrainingRadianceQuery, mNRC.pTrainingRadianceSample,
             mNRCVoxel.pInferenceQueryCounter, mNRCVoxel.pTrainingSampleCounter, mNRCVoxel.pTrainingQueryCounter);
     }
     if (mNRCOptionChanged) {
@@ -159,11 +148,14 @@ bool NRCPathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& 
     pRenderContext->clearUAV(mNRCVoxel.pInferenceQueryCounter->getUAV().get(), uint4(0));
     pRenderContext->clearUAV(mNRCVoxel.pTrainingQueryCounter->getUAV().get(), uint4(0));
     pRenderContext->clearUAV(mNRCVoxel.pTrainingSampleCounter->getUAV().get(), uint4(0));
-
-    //cudaMemset(mNRCVoxel.pInferenceQueryCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
-    //cudaMemset(mNRCVoxel.pTrainingQueryCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
-    //cudaMemset(mNRCVoxel.pTrainingSampleCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
-    
+    {
+        //pRenderContext->flush(true);
+        //cudaMemset(mNRCVoxel.pInferenceQueryCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
+        //cudaMemset(mNRCVoxel.pTrainingQueryCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
+        //cudaMemset(mNRCVoxel.pTrainingSampleCounter->getCUDADeviceAddress(), 0, sizeof(uint32_t) * mNRCVoxel.nVoxels);
+        //cudaDeviceSynchronize();
+    }
+    //
     mTracer.pNRCPixelStats->beginFrame(pRenderContext, renderData.getDefaultTextureDims());
     return state;
 }
@@ -222,6 +214,7 @@ void NRCPathTracer::renderUI(Gui::Widgets& widget)
     }
     if(mNRC.enableNRC){
         widget.checkbox("Enable training", mNRC.pNRC->enableTraining());
+        widget.checkbox("Enable inference", mNRC.pNRC->enableInference());
 
         if (auto group = widget.group("NRC Lowlevel Params")) {
             if (widget.var("Max inference bounces", mNRC.max_inference_bounces, 3, 15, 1)
@@ -432,7 +425,6 @@ void NRCPathTracer::setNRCData(const RenderData& renderData)
     pVars["gScreenQueryReflectance"] = mScreen.pScreenQueryReflectance;
 
     pVars["gInferenceRadianceQuery"] = mNRC.pInferenceRadianceQuery;
-    pVars["gInferenceRadiancePixel"] = mNRC.pInferenceRadiancePixel;
     pVars["gTrainingRadianceQuery"] = mNRC.pTrainingRadianceQuery;
     pVars["gTrainingRadianceSample"] = mNRC.pTrainingRadianceSample;
 

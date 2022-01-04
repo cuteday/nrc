@@ -26,8 +26,6 @@ namespace NRC {
         cudaSurfaceObject_t screenResult;       // write inferenced results here
         NRC::RadianceQuery* trainingQuery = nullptr;
         NRC::RadianceSample* trainingSample = nullptr;
-        uint2* inferenceQueryPixel = nullptr;
-        //uint32_t* counterBufferPtr = nullptr;
         // voxel related
         uint32_t* trainingSampleCounter = nullptr;
         uint32_t* trainingQueryCounter = nullptr;

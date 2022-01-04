@@ -37,23 +37,22 @@ namespace NRC {
         void resetParameters();
 
         bool& enableTraining() { return mEnableTraining; }
+        bool& enableInference() { return mEnableInference; }
 
         void registerNRCResources(Falcor::Buffer::SharedPtr pInferenceQueryBuffer,
-            Falcor::Buffer::SharedPtr pInferenceQueryPixel,
             Falcor::Texture::SharedPtr pScreenResultTexture,
             Falcor::Buffer::SharedPtr pTrainingQueryBuffer,
             Falcor::Buffer::SharedPtr pTrainingSampleBuffer,
-            //Falcor::Buffer::SharedPtr pSharedCounterBuffer,
             Falcor::Buffer::SharedPtr pInferenceQueryCounter,
             Falcor::Buffer::SharedPtr pTrainingSampleCounter,
             Falcor::Buffer::SharedPtr pTrainingQueryCounter) {
             mParameters.screenSize = uint2(pScreenResultTexture->getWidth(), pScreenResultTexture->getHeight());
             mResource.screenResult = FalcorCUDA::mapTextureToSurfaceObject(pScreenResultTexture, cudaArrayColorAttachment);
             mResource.inferenceQuery = (NRC::RadianceQuery*)pInferenceQueryBuffer->getCUDADeviceAddress();
-            mResource.inferenceQueryPixel = (uint2*)pInferenceQueryPixel->getCUDADeviceAddress();
+            
             mResource.trainingQuery = (NRC::RadianceQuery*)pTrainingQueryBuffer->getCUDADeviceAddress();
             mResource.trainingSample = (NRC::RadianceSample*)pTrainingSampleBuffer->getCUDADeviceAddress();
-            //mResource.counterBufferPtr = (uint32_t*)pSharedCounterBuffer->getCUDADeviceAddress();
+
             mResource.inferenceQueryCounter = (uint32_t*)pInferenceQueryCounter->getCUDADeviceAddress();
             mResource.trainingSampleCounter = (uint32_t*)pTrainingSampleCounter->getCUDADeviceAddress();
             mResource.trainingQueryCounter = (uint32_t*)pTrainingQueryCounter->getCUDADeviceAddress();
@@ -76,6 +75,8 @@ namespace NRC {
 
         // register interop texture/surface here
         NRCResource mResource;
-        bool mEnableTraining = true;
+
+        bool mEnableTraining = false;
+        bool mEnableInference = false;
     };
 }

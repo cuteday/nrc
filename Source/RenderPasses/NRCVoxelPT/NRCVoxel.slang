@@ -7,6 +7,9 @@ import RenderPasses.Shared.PathTracer.PathData;
 
 import DataStructure;
 
+#define DEBUG_RAY_FOOTPRINT 0
+
+
 #ifndef NRC_MAX_TRAINING_BOUNCES
 #define NRC_MAX_TRAINING_BOUNCES 5
 #endif
@@ -99,7 +102,7 @@ RWStructuredBuffer<RadianceQuery> gTrainingRadianceQuery;
 RWStructuredBuffer<RadianceSample> gTrainingRadianceSample;
 // for self training data, additional radiance info is needed
 RWStructuredBuffer<RadianceQuery> gInferenceRadianceQuery;
-RWStructuredBuffer<uint2> gInferenceRadiancePixel;
+//RWStructuredBuffer<uint2> gInferenceRadiancePixel;
 
 // count the numbers of each voxel using atomic operations...
 RWStructuredBuffer<uint> gVoxelInferenceQueryCounter;
@@ -207,7 +210,6 @@ void writeScreenInferenceQuery(ShadingData sd, float3 factor, float3 bias)
     if (index < gNRCScreenSize.x * gNRCScreenSize.y)
     {
         gInferenceRadianceQuery[index] = query;
-        gInferenceRadiancePixel[index] = gNRCPixel;
         // update voxel inference counter
         InterlockedAdd(gVoxelInferenceQueryCounter[query.voxel_idx], 1);
     }
@@ -238,9 +240,9 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
     gTrainingRadianceSample[idx] = sample;
     // update voxel training sample counter
     InterlockedAdd(gVoxelTrainingSampleCounter[query.voxel_idx], 1);
-    print("added a training sample at voxel #", query.voxel_idx);
+/*    print("added a training sample at voxel #", query.voxel_idx);
     if (query.voxel_idx > 0)
-        print("however it has been placed outside the voxel, its ncoord: ", query.pos);
+        print("however it has been placed outside the voxel, its ncoord: ", query.pos);*/
 }
 
 /*
@@ -248,9 +250,11 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
  */
 void debugRayFootprint(const PathData path, const NRCRayFootprint footprint)
 {
+#if DEBUG_RAY_FOOTPRINT
     print("At path depth: ", path.length);
     print("Path pdf: ", path.pdf);
     print("Ray spread: ", footprint.spread);
     print("Path intersection: ", path.origin);
     print("Path a0: ", footprint.a0);
+#endif
 }

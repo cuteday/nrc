@@ -268,12 +268,15 @@ namespace NRC {
     void VoxelNetwork::prepareTraining()
     {
         // currently cost << 1ms, seems good φ(゜▽゜*)♪
-        // thrust's copy routine costs similar to 1 cudaMemcpy. 
-        thrust::copy(mResource.trainingSampleCounter, mResource.trainingSampleCounter + voxel_param.voxel_num, mStat.training_sample_counter.begin());
-        thrust::copy(mResource.trainingQueryCounter, mResource.trainingQueryCounter + voxel_param.voxel_num, mStat.training_query_counter.begin());
+        // thrust's copy routine costs similar to 1 cudaMemcpy.
+        uint32_t n_voxels = voxel_param.voxel_num;
+        cudaMemcpy(mStat.training_sample_counter.data().get(), mResource.trainingSampleCounter, sizeof(uint32_t) * n_voxels, cudaMemcpyDeviceToDevice);
+        cudaMemcpy(mStat.training_query_counter.data().get(), mResource.trainingQueryCounter, sizeof(uint32_t) * n_voxels, cudaMemcpyDeviceToDevice);
+        //thrust::copy(mResource.trainingSampleCounter, mResource.trainingSampleCounter + voxel_param.voxel_num, mStat.training_sample_counter.begin());
+        //thrust::copy(mResource.trainingQueryCounter, mResource.trainingQueryCounter + voxel_param.voxel_num, mStat.training_query_counter.begin());
         thrust::copy(mStat.training_sample_counter.begin(), mStat.training_sample_counter.end(), mStat.training_sample_counter_h.begin());
         thrust::copy(mStat.training_query_counter.begin(), mStat.training_query_counter.end(), mStat.training_query_counter_h.begin());
-        //mStat.inference_query_count = thrust::reduce(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), 0, thrust::plus<uint32_t>());
+       
         mStat.training_query_count = thrust::reduce(mStat.training_query_counter_h.begin(), mStat.training_query_counter_h.end(), 0, thrust::plus<uint32_t>());
         mStat.training_sample_count = thrust::reduce(mStat.training_sample_counter_h.begin(), mStat.training_sample_counter_h.end(), 0, thrust::plus<uint32_t>());
         // until here, the all above operations costs < 1ms
@@ -290,7 +293,8 @@ namespace NRC {
     void VoxelNetwork::prepareInference()
     {
         uint32_t n_voxels = voxel_param.voxel_num;
-        thrust::copy(mResource.inferenceQueryCounter, mResource.inferenceQueryCounter + n_voxels, mStat.inference_query_counter.begin());
+        cudaMemcpy(mStat.inference_query_counter.data().get(), mResource.inferenceQueryCounter, sizeof(uint32_t) * n_voxels, cudaMemcpyDeviceToDevice);
+        //thrust::copy(mResource.inferenceQueryCounter, mResource.inferenceQueryCounter + n_voxels, mStat.inference_query_counter.begin());
         thrust::copy(mStat.inference_query_counter.begin(), mStat.inference_query_counter.end(), mStat.inference_query_counter_h.begin());
         mStat.inference_query_count = thrust::reduce(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), 0, thrust::plus<uint32_t>());
         thrust::exclusive_scan(mStat.inference_query_counter_h.begin(), mStat.inference_query_counter_h.end(), mStat.inference_query_offset_h.begin());
@@ -299,8 +303,6 @@ namespace NRC {
         thrust::transform(mResource.inferenceQuery, mResource.inferenceQuery + mStat.inference_query_count,
             mStat.inference_query_voxel.begin(), get_voxel_index());
         {   // copy these queries costs ~1ms!
-            //thrust::copy(mResource.inferenceQuery, mResource.inferenceQuery + mStat.inference_query_count, mStat.inference_query.begin());
-            //thrust::sort_by_key(mStat.inference_query_voxel.begin(), mStat.inference_query_voxel.end(), mStat.inference_query.begin(), thrust::less<uint32_t>());
             thrust::sort_by_key(mStat.inference_query_voxel.begin(), mStat.inference_query_voxel.end(), mResource.inferenceQuery, thrust::less<uint32_t>());
         }
 #else
