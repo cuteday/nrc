@@ -18,6 +18,7 @@
 #include <tiny-cuda-nn/common.h>
 #include <tiny-cuda-nn/cute_network_with_input_encoding.h>
 
+
 using namespace tcnn;
 using precision_t = tcnn::network_precision_t;
 using thrust::device_vector;
@@ -26,6 +27,9 @@ using thrust::host_vector;
 #define GPUMatrix GPUMatrix<float, CM>
 
 namespace {
+    //using namespace NRC;
+    //using namespace NRC::Parameters;
+
     // cuda related
     cudaStream_t inference_stream;
     cudaStream_t training_stream;
@@ -36,7 +40,7 @@ namespace {
 
     struct _Network {
         //std::vector<std::shared_ptr<NetworkWithInputEncoding<precision_t>>> voxel_network;
-        std::vector<std::shared_ptr<CuteNetworkWithInputEncoding<precision_t, 64>>> voxel_network;
+        std::vector<std::shared_ptr<CuteNetworkWithInputEncoding<precision_t, NRC::Parameters::network_width>>> voxel_network;
         std::vector<std::shared_ptr<Loss<precision_t>>> voxel_loss;
         std::vector<std::shared_ptr<Optimizer<precision_t>>> voxel_optimizer;
         std::vector<std::shared_ptr<Trainer<float, precision_t, precision_t>>> voxel_trainer;
@@ -238,6 +242,10 @@ namespace NRC {
         json optimizer_opts = net_config.value("optimizer", json::object());
         json network_opts = net_config.value("network", json::object());
         json encoding_opts = net_config.value("encoding", json::object());
+        if (network_opts.value("n_neurons", 64) != network_width) {
+            std::cout << "Changing network width to" + std::to_string(network_width) +", which declared in Parameters.h" << std::endl;
+            network_opts["n_neurons"] = network_width;
+        }
         m_learning_rate = optimizer_opts["nested"].value("learning_rate", 1e-3);
 
         std::cout << "VoxelNetwork::Initialize networks for " + std::to_string(n_voxels) + " voxels!" << std::endl;
@@ -251,7 +259,7 @@ namespace NRC {
             mNetwork->voxel_trainer[i] = std::make_shared<Trainer<float, precision_t, precision_t>>(
                 mNetwork->voxel_network[i], mNetwork->voxel_optimizer[i], mNetwork->voxel_loss[i]);
             // preallocate infernal buffers (cuda memories) for networks
-            mNetwork->voxel_network[i]->preallocate_training_buffer(batch_size);
+            //mNetwork->voxel_network[i]->preallocate_training_buffer(batch_size);
             if (i) mNetwork->voxel_network[i]->share_inference_buffer(mNetwork->voxel_network[0]);
             else mNetwork->voxel_network[0]->preallocate_inference_buffer(max_inference_query_size);
         }

@@ -8,7 +8,7 @@
 			"decay": 0.99,
 			"nested": {
 				"otype": "Adam",
-				"learning_rate": 4.5e-3,
+				"learning_rate": 1e-3,
 				"beta1": 0.9,
 				"beta2": 0.99,
 				"epsilon": 1e-8,
@@ -45,6 +45,6 @@
 		}
 	},
 	"voxel":{
-		"size": [2, 2, 2]
+		"size": [3,3,3]
 	}
 }

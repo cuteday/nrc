@@ -76,7 +76,7 @@ namespace NRC {
         // register interop texture/surface here
         NRCResource mResource;
 
-        bool mEnableTraining = false;
-        bool mEnableInference = false;
+        bool mEnableTraining = true;
+        bool mEnableInference = true;
     };
 }

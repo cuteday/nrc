@@ -43,6 +43,7 @@ namespace NRC {
         const unsigned int max_training_sample_size = 1920 * 1080 * 15 / 36;
         const uint32_t self_query_batch_size = resolution / trainingPathStride.x / trainingPathStride.y;     // ~ 57600
 
+        const int network_width = 32;
 #if AUX_INPUTS
         const uint32_t input_dim = 14;         // pos dir normal roughness diffuse specular
 #else

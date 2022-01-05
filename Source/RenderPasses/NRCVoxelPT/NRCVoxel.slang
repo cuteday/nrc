@@ -83,6 +83,9 @@ struct NRCRayFootprint
     }
 };
 
+
+// bool ISNAN(float3 x){ return any(x != x); }
+
 static uint2 gNRCPixel;
 void NRCSetPixel(uint2 pixel)
 {
@@ -229,6 +232,9 @@ void addTrainingSample(float3 a, float3 b, RadianceQuery query, int queryIndex)
 {
     if (any(isnan(a)) || any(isnan(b)) || any(isinf(a)) || any(isinf(b)))
         // TODO: does isnan() in hlsl works properly?
+        return;
+    if (any(b > 100. )|| any(b < 0.) || any(a < 0.)) return;
+    if (any(isnan(query.normal)) || any(isnan(query.diffuse)) || any(isnan(query.specular)))
         return;
     uint idx = gTrainingRadianceSample.IncrementCounter();
     if (idx > 1344000) return;
