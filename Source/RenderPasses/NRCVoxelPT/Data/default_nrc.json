@@ -35,7 +35,7 @@
 			]
 		},
 		"network": {
-			"otype": "FullyFusedMLP",
+			"otype": "CuteMLP",
 			"activation": "ReLU",
 			"output_activation": "None",
 			"n_neurons": 64,
@@ -45,6 +45,6 @@
 		}
 	},
 	"voxel":{
-		"size": [4, 4, 4]
+		"size": [2, 2, 2]
 	}
 }

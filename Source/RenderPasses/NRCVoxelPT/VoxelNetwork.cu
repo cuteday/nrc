@@ -16,6 +16,7 @@
 #include <json/json.hpp>
 #include <tiny-cuda-nn/config.h>
 #include <tiny-cuda-nn/common.h>
+#include <tiny-cuda-nn/cute_network_with_input_encoding.h>
 
 using namespace tcnn;
 using precision_t = tcnn::network_precision_t;
@@ -34,7 +35,8 @@ namespace {
     curandGenerator_t rng;
 
     struct _Network {
-        std::vector<std::shared_ptr<NetworkWithInputEncoding<precision_t>>> voxel_network;
+        //std::vector<std::shared_ptr<NetworkWithInputEncoding<precision_t>>> voxel_network;
+        std::vector<std::shared_ptr<CuteNetworkWithInputEncoding<precision_t, 64>>> voxel_network;
         std::vector<std::shared_ptr<Loss<precision_t>>> voxel_loss;
         std::vector<std::shared_ptr<Optimizer<precision_t>>> voxel_optimizer;
         std::vector<std::shared_ptr<Trainer<float, precision_t, precision_t>>> voxel_trainer;
@@ -244,9 +246,14 @@ namespace NRC {
             //auto [loss, optimizer, network, trainer] = create_from_config(input_dim, output_dim, net_config);
             mNetwork->voxel_loss[i] = std::shared_ptr<Loss<precision_t>>(create_loss<precision_t>(loss_opts));
             mNetwork->voxel_optimizer[i] = std::shared_ptr<Optimizer<precision_t>>(create_optimizer<precision_t>(optimizer_opts));
-            mNetwork->voxel_network[i] = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
+            //mNetwork->voxel_network[i] = std::make_shared<NetworkWithInputEncoding<precision_t>>(input_dim, output_dim, encoding_opts, network_opts);
+            mNetwork->voxel_network[i] = std::make_shared<CuteNetworkWithInputEncoding<precision_t, 64>>(input_dim, output_dim, encoding_opts, network_opts);
             mNetwork->voxel_trainer[i] = std::make_shared<Trainer<float, precision_t, precision_t>>(
                 mNetwork->voxel_network[i], mNetwork->voxel_optimizer[i], mNetwork->voxel_loss[i]);
+            // preallocate infernal buffers (cuda memories) for networks
+            mNetwork->voxel_network[i]->preallocate_training_buffer(batch_size);
+            if (i) mNetwork->voxel_network[i]->share_inference_buffer(mNetwork->voxel_network[0]);
+            else mNetwork->voxel_network[0]->preallocate_inference_buffer(max_inference_query_size);
         }
 
         mMemory->training_data = new GPUMatrix(input_dim, batch_size);
@@ -287,7 +294,7 @@ namespace NRC {
         thrust::copy(mMemory->sample_voxel_counter.begin(), mMemory->sample_voxel_counter.end(), mMemory->sample_voxel_counter_h.begin());
         // regenerate random sequence for training sample shuffling
         curandGenerateUniform(rng, mMemory->random_seq->data(), max_training_sample_voxel);
-        CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));
+        //CUDA_CHECK_THROW(cudaStreamSynchronize(training_stream));
     }
 
     void VoxelNetwork::prepareInference()
@@ -313,7 +320,7 @@ namespace NRC {
         linear_kernel(sortForInference<output_dim>, 0, inference_stream, mStat.inference_query_count, mResource.inferenceQuery,
             mStat.inference_query_offset.data().get(), mMemory->inference_voxel_counter.data().get(), mMemory->inference_query_sorted.data().get());
 #endif
-        CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
+        //CUDA_CHECK_THROW(cudaStreamSynchronize(inference_stream));
     }
 
     void VoxelNetwork::inference()
@@ -359,7 +366,7 @@ namespace NRC {
         for (int i = 0; i < n_voxels; i++) {
             if (mStat.training_sample_counter_h[i] >= 128) {
                 uint32_t training_batch_size = std::min(previous_multiple(mStat.training_sample_counter_h[i], 128u), batch_size);
-                uint32_t total_samples = std::min(mMemory->sample_voxel_counter_h[i], (uint64_t)max_training_sample_voxel);
+                uint32_t total_samples = std::min(mMemory->sample_voxel_counter_h[i], (uint64_t)batch_size);
                 n_all_samples += training_batch_size;
                 auto s = mMemory->sample_storage[i];
                 linear_kernel(generateTrainingData<input_dim>, 0, training_stream, training_batch_size,

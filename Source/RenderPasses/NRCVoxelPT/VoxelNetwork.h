@@ -60,10 +60,10 @@ namespace NRC {
         __host__ void inference();
         __host__ void train(float& loss);
 
-
     private:
         uint32_t seed = 7272u;
         float m_learning_rate = 1e-4f;
+        int m_network_width = 64;
         NRC::NRCResource mResource;
     };
 }
